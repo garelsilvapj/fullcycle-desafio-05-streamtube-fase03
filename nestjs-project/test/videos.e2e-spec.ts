@@ -235,6 +235,18 @@ describe('Videos (e2e)', () => {
     });
   });
 
+  describe('rate limiting', () => {
+    it('is not throttled by the global auth limit (polling and Range requests)', async () => {
+      const bearer = await loginAs('owner@example.com');
+      for (let i = 0; i < 15; i++) {
+        await http()
+          .get('/videos')
+          .set('Authorization', `Bearer ${bearer}`)
+          .expect(200);
+      }
+    });
+  });
+
   describe('POST /videos', () => {
     it('creates an uploading draft with a single presigned URL and no storage keys in the body', async () => {
       const bearer = await loginAs('owner@example.com');

@@ -21,6 +21,7 @@ import {
   getSchemaPath,
 } from '@nestjs/swagger';
 import type { Response } from 'express';
+import { SkipThrottle } from '@nestjs/throttler';
 
 import { VideosService } from './videos.service';
 import { CreateVideoDto } from './dto/create-video.dto';
@@ -43,6 +44,9 @@ const ID_PARAM = { name: 'id', format: 'uuid', description: 'ID do vídeo' };
 
 // O JwtAuthGuard é global (APP_GUARD): todas as rotas exigem autenticação.
 // Nesta fase todo acesso é restrito ao dono do canal; leitura pública fica para a Fase 05.
+// O rate limit global (10 req/min) existe para proteger o auth; polling de status e streaming
+// por Range fazem dezenas de chamadas por minuto, então estas rotas (já autenticadas) não o usam.
+@SkipThrottle()
 @ApiTags('videos')
 @ApiBearerAuth('access-token')
 @ApiExtraModels(SingleUploadPlanDto, MultipartUploadPlanDto)
