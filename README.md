@@ -115,7 +115,29 @@ docker compose exec nestjs-api npm run test:e2e       # end-to-end (HTTP via sup
 docker compose exec nestjs-api npm run test:cov       # cobertura
 ```
 
-Sufixos: `*.spec.ts` (unitário), `*.integration-spec.ts` (integração com banco real), `*.e2e-spec.ts` (end-to-end). Testes de integração/e2e rodam com `--runInBand`.
+Sufixos: `*.spec.ts` (unitário), `*.integration-spec.ts` (integração com banco/MinIO/Redis reais), `*.e2e-spec.ts` (end-to-end). Testes de integração/e2e rodam com `--runInBand` (`test:e2e` já embute a flag; para `npm test` passe `-- --runInBand`).
+
+### Worker (Vitest)
+
+```bash
+cd worker
+npm ci && npm run typecheck && npm test                     # no host: unit (FFmpeg real é pulado sem ffmpeg)
+docker build --target test -t streamtube-worker-test . && docker run --rm streamtube-worker-test   # com FFmpeg real
+```
+
+### Validação funcional local (aplicação rodando)
+
+Com a stack do backend no ar e a API em `start:dev`:
+
+```bash
+bash scripts/smoke-videos.sh                # registrar → PUT → confirmar → worker → stream/download/thumbnail → multipart → delete
+```
+
+Roteiro manual e cenários de resiliência em `docs/phases/phase-03-videos/manual-validation.md`.
+
+### CI
+
+`.github/workflows/ci.yml` roda em push/PR: API (typecheck, build, lint, unit + integração + e2e com Postgres/Redis/MinIO/Mailpit, frescor do `openapi.json`), worker (typecheck, build, testes na imagem com FFmpeg) e frontend (typecheck, lint, Vitest).
 
 ### Frontend (Vitest + Playwright)
 
