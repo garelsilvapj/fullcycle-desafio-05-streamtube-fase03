@@ -13,6 +13,9 @@ docker compose ps   # all services must show status "running"
 Then verify each infrastructure service is actually ready to accept connections — not just running:
 
 - **PostgreSQL:** `docker compose exec db pg_isready -U streamtube` — expect `accepting connections`
+- **Redis:** `docker compose exec redis redis-cli ping` — expect `PONG`
+- **MinIO:** `curl -sf http://localhost:9000/minio/health/live` — expect HTTP 200; the `createbuckets` one-shot service must have exited with code 0 (`docker compose ps -a createbuckets`)
+- **Worker:** `docker compose logs worker` — expect the line `[worker] ouvindo a fila 'video-processing'` (it needs Redis, MinIO and the DB migrated)
 
 Only start the NestJS dev server (`npm run start:dev`) when the user **explicitly** asks to run the application — never as part of "start the environment".
 
@@ -31,9 +34,15 @@ docker compose exec nestjs-api npm install
 docker compose exec nestjs-api npm run start:dev
 ```
 
-Services:
-- `nestjs-api` — NestJS API, port `3000`
+Services (`compose.yaml`):
+- `nestjs-api` — NestJS API, port `3000` (idle dev container; start the server with `npm run start:dev`)
 - `db` — PostgreSQL 17, port `5432`, database `streamtube`, user/password `streamtube`
+- `mailpit` — SMTP `1025`, web UI `8025`
+- `redis` — Redis 7, port `6379` (BullMQ queue `video-processing`)
+- `minio` — S3 API `9000`, console `9001` (`minioadmin`/`minioadmin`), bucket `streamtube-videos` created by the one-shot `createbuckets` service
+- `worker` — video worker built from `../worker` (BullMQ consumer + FFmpeg); env is set inline in `compose.yaml`
+
+Inside containers always address other services by their Compose name (`db`, `redis`, `minio`, `mailpit`) — never `localhost`.
 
 All verification and teardown commands run on the **host machine**:
 
@@ -88,8 +97,11 @@ Integration and e2e suites share a single test database. They **must** be run wi
 
 ```bash
 docker compose exec nestjs-api npm test -- --runInBand
-docker compose exec nestjs-api npm run test:e2e   # already configured
+docker compose exec nestjs-api npm run test:integration   # already passes --runInBand
+docker compose exec nestjs-api npm run test:e2e -- --runInBand
 ```
+
+> `test:e2e` does **not** hardcode `--runInBand` yet (tracked in `docs/evolution-plan.md`, Etapa 3). Until it does, pass the flag explicitly as above.
 
 Parallel execution causes FK violations, deadlocks, and cross-suite contamination because suites truncate or seed shared tables concurrently.
 

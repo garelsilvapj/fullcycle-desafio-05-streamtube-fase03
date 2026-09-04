@@ -24,7 +24,7 @@ escala para 10GB. **Trade-off:** fluxo de upload em 2 passos (registrar → conf
 **Contexto:** transcode/thumbnail são pesados e assíncronos. **Decisão:** enfileirar um job por
 vídeo em **BullMQ (Redis)**; a API é o *producer*, o worker é o *consumer*. **Alternativa
 descartada:** processar inline no request. **Trade-off:** Redis novo na infra, em troca de
-retمy, concorrência e isolamento do processamento.
+retry, concorrência e isolamento do processamento.
 
 ## TD-03.4 — Worker de vídeo em processo separado com FFmpeg
 

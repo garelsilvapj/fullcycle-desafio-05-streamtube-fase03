@@ -42,3 +42,5 @@ next-env.d.ts
 openapi.json
 
 .playwright-cli/
+# env example is committed on purpose
+!.env.example
