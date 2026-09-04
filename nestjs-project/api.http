@@ -118,3 +118,99 @@ Content-Type: {{contentType}}
   "token": "{{resetToken}}",
   "new_password": "new-password123"
 }
+
+
+###
+# ─────────────────────────────────────────────
+# VÍDEOS (Fase 03) — requer accessToken do login
+# ─────────────────────────────────────────────
+# Fluxo: registrar → PUT do arquivo na URL pré-assinada → confirmar → worker processa → stream.
+# Variáveis: cole o `video.id` da resposta de registro em @videoId e a `upload.url` em @uploadUrl.
+@videoId = 00000000-0000-0000-0000-000000000000
+@uploadUrl = http://localhost:9000/streamtube-videos/...
+@uploadId = ...
+
+### 10. Registrar vídeo (single: sem sizeBytes ou abaixo do threshold de 100MB)
+# @name registerVideo
+POST {{baseUrl}}/videos
+Content-Type: {{contentType}}
+Authorization: Bearer {{accessToken}}
+
+{
+  "title": "Meu primeiro vídeo",
+  "description": "Enviado pelo api.http",
+  "sizeBytes": 1048576
+}
+
+### 11. Enviar o arquivo direto ao storage (URL pré-assinada da resposta anterior)
+# O REST Client envia o arquivo referenciado com `< caminho`.
+PUT {{uploadUrl}}
+Content-Type: video/mp4
+
+< ./tmp/sample.mp4
+
+### 12. Confirmar upload single → status uploaded + job enfileirado
+POST {{baseUrl}}/videos/{{videoId}}/confirm
+Authorization: Bearer {{accessToken}}
+
+### 13. Registrar vídeo grande → plano multipart (uploadId + URLs por parte)
+POST {{baseUrl}}/videos
+Content-Type: {{contentType}}
+Authorization: Bearer {{accessToken}}
+
+{
+  "title": "Vídeo grande",
+  "sizeBytes": 314572800
+}
+
+### 14. Finalizar multipart (ETags devolvidos pelos PUTs das partes)
+POST {{baseUrl}}/videos/{{videoId}}/multipart/complete
+Content-Type: {{contentType}}
+Authorization: Bearer {{accessToken}}
+
+{
+  "uploadId": "{{uploadId}}",
+  "parts": [
+    { "partNumber": 1, "etag": "\"etag-da-parte-1\"" },
+    { "partNumber": 2, "etag": "\"etag-da-parte-2\"" }
+  ]
+}
+
+### 15. Cancelar multipart (remove o registro do vídeo)
+POST {{baseUrl}}/videos/{{videoId}}/multipart/abort
+Content-Type: {{contentType}}
+Authorization: Bearer {{accessToken}}
+
+{
+  "uploadId": "{{uploadId}}"
+}
+
+### 16. Meus vídeos
+GET {{baseUrl}}/videos
+Authorization: Bearer {{accessToken}}
+
+### 17. Consultar vídeo (status, duração, slug, thumbnailUrl)
+GET {{baseUrl}}/videos/{{videoId}}
+Authorization: Bearer {{accessToken}}
+
+### 18. Streaming — primeiros 1024 bytes (espera 206 + Content-Range)
+GET {{baseUrl}}/videos/{{videoId}}/stream
+Range: bytes=0-1023
+Authorization: Bearer {{accessToken}}
+
+### 19. Streaming — Range fora do arquivo (espera 416)
+GET {{baseUrl}}/videos/{{videoId}}/stream
+Range: bytes=999999999999-
+Authorization: Bearer {{accessToken}}
+
+### 20. Download (302 para URL pré-assinada)
+GET {{baseUrl}}/videos/{{videoId}}/download
+Authorization: Bearer {{accessToken}}
+
+### 21. Thumbnail (302 para URL pré-assinada)
+GET {{baseUrl}}/videos/{{videoId}}/thumbnail
+Authorization: Bearer {{accessToken}}
+
+### 22. Excluir vídeo (204)
+DELETE {{baseUrl}}/videos/{{videoId}}
+Authorization: Bearer {{accessToken}}

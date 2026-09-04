@@ -110,6 +110,56 @@ describe('exportSpec (integration)', () => {
     }
   });
 
+  it('documents every videos endpoint with summary and access-token security', () => {
+    const paths = document.paths as Record<
+      string,
+      Record<string, Record<string, unknown>>
+    >;
+    const expected: Array<[string, string]> = [
+      ['/videos', 'post'],
+      ['/videos', 'get'],
+      ['/videos/{id}', 'get'],
+      ['/videos/{id}', 'delete'],
+      ['/videos/{id}/confirm', 'post'],
+      ['/videos/{id}/multipart/complete', 'post'],
+      ['/videos/{id}/multipart/abort', 'post'],
+      ['/videos/{id}/thumbnail', 'get'],
+      ['/videos/{id}/download', 'get'],
+      ['/videos/{id}/stream', 'get'],
+    ];
+
+    for (const [path, method] of expected) {
+      const operation = paths[path]?.[method];
+      expect(operation).toBeDefined();
+      expect((operation.summary as string).length).toBeGreaterThan(0);
+      const security = operation.security as Array<Record<string, unknown>>;
+      expect(security.some((req) => 'access-token' in req)).toBe(true);
+    }
+  });
+
+  it('exposes the video response and upload plan schemas without storage keys', () => {
+    const components = document.components as Record<string, unknown>;
+    const schemas = components.schemas as Record<
+      string,
+      Record<string, unknown>
+    >;
+    for (const name of [
+      'VideoResponseDto',
+      'RegisterVideoResponseDto',
+      'SingleUploadPlanDto',
+      'MultipartUploadPlanDto',
+    ]) {
+      expect(schemas[name]).toBeDefined();
+    }
+    const props = Object.keys(
+      schemas['VideoResponseDto'].properties as Record<string, unknown>,
+    );
+    expect(props).toEqual(
+      expect.arrayContaining(['id', 'slug', 'status', 'thumbnailUrl']),
+    );
+    expect(props.some((p) => p.endsWith('_key'))).toBe(false);
+  });
+
   it('all auth endpoints have a non-empty summary', () => {
     const paths = document.paths as Record<
       string,

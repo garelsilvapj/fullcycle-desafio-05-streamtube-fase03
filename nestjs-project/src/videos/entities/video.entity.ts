@@ -9,6 +9,7 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 import { Channel } from '../../channels/entities/channel.entity';
+import { VIDEO_SLUG_LENGTH, VIDEO_TITLE_MAX_LENGTH } from '../videos.constants';
 
 export enum VideoStatus {
   UPLOADING = 'uploading',
@@ -27,7 +28,12 @@ export class Video {
   @Column({ type: 'uuid' })
   channel_id: string;
 
-  @Column({ type: 'varchar', length: 200 })
+  /** URL curta única do vídeo (11 chars URL-safe). Ver videos.constants.ts. */
+  @Index('UQ_videos_slug', { unique: true })
+  @Column({ type: 'varchar', length: VIDEO_SLUG_LENGTH })
+  slug: string;
+
+  @Column({ type: 'varchar', length: VIDEO_TITLE_MAX_LENGTH })
   title: string;
 
   @Column({ type: 'text', nullable: true })

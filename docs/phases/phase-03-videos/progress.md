@@ -29,7 +29,7 @@ worker), CI e ausência da fatia frontend. O fechamento segue as etapas do plano
 | Etapa | Escopo | Status |
 |---|---|---|
 | 0 | Verdade do repositório e higiene (docs, `worker/worker/`, `.gitignore`, `.env.example`) | ✅ feito (2026-09-04) |
-| 1 | Hardening do backend (endpoint público de assinatura, response DTO, autorização, estados, `DELETE`, slug, OpenAPI) | ⏳ |
+| 1 | Hardening do backend (endpoint público de assinatura, response DTO, autorização, estados, `DELETE`, slug, OpenAPI) | ✅ feito (2026-09-04) — 71 testes unitários em videos/storage/queue; `openapi.json` regenerado |
 | 2 | Worker resiliente (módulos, política de falha, shutdown, Dockerfile, testes) | ⏳ |
 | 3 | Testes de integração e e2e (vídeos, storage, fila, migrations) | ⏳ |
 | 4 | Validação funcional local (`scripts/smoke-videos.sh` + `manual-validation.md`) | ⏳ |
