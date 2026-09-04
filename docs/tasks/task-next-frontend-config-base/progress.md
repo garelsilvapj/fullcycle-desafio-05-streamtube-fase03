@@ -1,6 +1,6 @@
 # task-next-frontend-config-base — Progress
 
-**Status:** in_progress
+**Status:** completed
 **SIs:** 2/2 completed
 
 ### SI-1 — Instalar deps e criar env loader

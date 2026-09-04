@@ -19,8 +19,26 @@ Acompanhamento da implementação (skill `implement`). Atualizado a cada Step Im
   JWT). O build completo requer `npm install` no `nestjs-project/` e no `worker/`.
 - Processamento real de vídeo exige FFmpeg instalado (já previsto na imagem do worker).
 
-## Pendências conhecidas (para rodar de ponta a ponta)
+## Fechamento da fase (pendente)
 
-1. `cd nestjs-project && npm install && npm run migration:run`.
-2. `docker compose up -d` (sobe db, redis, minio, api, worker).
-3. Fluxo: registrar vídeo → `PUT` no `uploadUrl` → confirmar → worker processa → `GET /stream`.
+Os 8 SIs do plano original estão implementados, mas a fase **não está fechada**. A auditoria de
+2026-09-04 (`docs/evolution-plan.md`, Parte A.4) encontrou lacunas de autorização, máquina de
+estados, streaming, resiliência do worker, testes (só 14 unitários; zero integração/e2e; zero no
+worker), CI e ausência da fatia frontend. O fechamento segue as etapas do plano de evolução:
+
+| Etapa | Escopo | Status |
+|---|---|---|
+| 0 | Verdade do repositório e higiene (docs, `worker/worker/`, `.gitignore`, `.env.example`) | ✅ feito (2026-09-04) |
+| 1 | Hardening do backend (endpoint público de assinatura, response DTO, autorização, estados, `DELETE`, slug, OpenAPI) | ⏳ |
+| 2 | Worker resiliente (módulos, política de falha, shutdown, Dockerfile, testes) | ⏳ |
+| 3 | Testes de integração e e2e (vídeos, storage, fila, migrations) | ⏳ |
+| 4 | Validação funcional local (`scripts/smoke-videos.sh` + `manual-validation.md`) | ⏳ |
+| 5 | CI completa (unit, integração/e2e com serviços, worker, frontend, openapi-freshness) | ⏳ |
+| 6 | Fatia `phase-03-videos-frontend` (upload, meus vídeos, player) | ⏳ |
+| 7 | Fechamento (docs, suíte completa verde, tag) | ⏳ |
+
+Para rodar de ponta a ponta hoje: `cd nestjs-project && cp .env.example .env && docker compose up -d --build`,
+`docker compose exec nestjs-api npm install && docker compose exec nestjs-api npm run migration:run`,
+`docker compose exec -d nestjs-api npm run start:dev`; fluxo registrar → `PUT` na URL pré-assinada →
+confirmar → worker processa → `GET /stream`. Observação: a URL pré-assinada usa o host `minio`, então
+o `PUT` a partir do host exige `S3_PUBLIC_ENDPOINT` (Etapa 1.1) ou uma entrada `minio` no `/etc/hosts`.
