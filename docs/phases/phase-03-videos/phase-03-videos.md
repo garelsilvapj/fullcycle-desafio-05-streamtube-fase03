@@ -184,8 +184,14 @@ com o storage por `S3_ENDPOINT` (rede Docker).
 
 - **Producer:** API, no `confirmUpload`. Payload `{ videoId }`, `jobId = videoId` (idempotente),
   `attempts: 5`, backoff exponencial.
-- **Consumer:** worker. Ao pegar o job: `uploaded → processing`; ao concluir: `→ ready`; ao
-  falhar após retries: `→ failed`.
+- **Consumer:** worker (`worker/src/processor.ts`). Ao pegar o job: `uploaded|failed → processing`
+  (transição guardada por `WHERE status IN (...)`; vídeo já `ready` ou em `processing` por outro
+  worker é ignorado — idempotente). Ao concluir: `→ ready` gravando `processed_key`,
+  `thumbnail_key`, `duration_sec` e `size_bytes` do MP4 processado. Em erro numa tentativa
+  intermediária: `→ uploaded` + `error` (o BullMQ reenfileira com backoff); na última tentativa:
+  `→ failed` + `error`. Upload dos artefatos via multipart automático (`@aws-sdk/lib-storage`).
+  Concorrência e `lockDuration` por env (`WORKER_CONCURRENCY`, `WORKER_LOCK_DURATION_MS`);
+  shutdown gracioso em SIGTERM/SIGINT; logs JSON.
 
 ---
 

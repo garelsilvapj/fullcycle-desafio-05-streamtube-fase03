@@ -1,180 +1,94 @@
 /**
  * Worker de processamento de vídeo — Fase 03.
  *
- * Consome a fila BullMQ `video-processing`. Para cada { videoId }:
- *   1. marca o vídeo como `processing`;
- *   2. baixa o original do object storage;
- *   3. gera thumbnail (JPG) e transcode normalizado (MP4 H.264/AAC) com FFmpeg;
- *   4. sobe os artefatos e marca o vídeo como `ready` (ou `failed` em erro).
- *
- * Roda em processo separado da API (TD-03.4). Idempotente por videoId.
- * Usa SQL direto (pg) com nomes de coluna snake_case, iguais aos da migration.
+ * Consome a fila BullMQ `video-processing` (producer: API NestJS, `jobId = videoId`).
+ * Pipeline em `processor.ts`; acesso a banco/storage/FFmpeg em módulos próprios.
+ * Roda em processo separado da API (TD-03.4).
  */
-import { Worker } from 'bullmq';
+import { Worker, type Job } from 'bullmq';
 import IORedis from 'ioredis';
-import { Client } from 'pg';
-import { S3Client, GetObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3';
-import ffmpeg from 'fluent-ffmpeg';
-import { createWriteStream, createReadStream, promises as fs } from 'fs';
-import { tmpdir } from 'os';
-import { join } from 'path';
-import { pipeline } from 'stream/promises';
-import type { Readable } from 'stream';
+import { loadConfig } from './config';
+import { createLogger } from './logger';
+import { createVideoRepository } from './db';
+import { createObjectStorage } from './storage';
+import { createMediaProcessor } from './ffmpeg';
+import { processVideo } from './processor';
 
-const QUEUE = process.env.VIDEO_QUEUE || 'video-processing';
-const BUCKET = process.env.S3_BUCKET || 'streamtube-videos';
+interface VideoJobData {
+  videoId: string;
+}
 
-const connection = new IORedis({
-  host: process.env.REDIS_HOST || 'redis',
-  port: parseInt(process.env.REDIS_PORT || '6379', 10),
-  maxRetriesPerRequest: null,
-});
+async function main(): Promise<void> {
+  const cfg = loadConfig();
+  const logger = createLogger({ queue: cfg.queueName });
 
-const s3 = new S3Client({
-  endpoint: process.env.S3_ENDPOINT || 'http://minio:9000',
-  region: process.env.S3_REGION || 'us-east-1',
-  forcePathStyle: true,
-  credentials: {
-    accessKeyId: process.env.S3_ACCESS_KEY || 'minioadmin',
-    secretAccessKey: process.env.S3_SECRET_KEY || 'minioadmin',
-  },
-});
-
-function pg(): Client {
-  return new Client({
-    host: process.env.DB_HOST || 'db',
-    port: parseInt(process.env.DB_PORT || '5432', 10),
-    user: process.env.DB_USERNAME || 'streamtube',
-    password: process.env.DB_PASSWORD || 'streamtube',
-    database: process.env.DB_NAME || 'streamtube',
+  const connection = new IORedis({
+    host: cfg.redis.host,
+    port: cfg.redis.port,
+    maxRetriesPerRequest: null,
   });
-}
+  const repo = createVideoRepository(cfg.db);
+  const storage = createObjectStorage(cfg.s3);
+  const media = createMediaProcessor(cfg.ffmpeg);
 
-async function setStatus(id: string, fields: Record<string, unknown>): Promise<void> {
-  const db = pg();
-  await db.connect();
-  const keys = Object.keys(fields);
-  const set = keys.map((k, i) => `"${k}" = $${i + 2}`).join(', ');
-  await db.query(`UPDATE videos SET ${set}, "updated_at" = now() WHERE id = $1`, [
-    id,
-    ...keys.map((k) => fields[k]),
-  ]);
-  await db.end();
-}
+  const worker = new Worker<VideoJobData>(
+    cfg.queueName,
+    async (job: Job<VideoJobData>) => {
+      const { videoId } = job.data;
+      logger.info('job recebido', { jobId: job.id, videoId, attempt: job.attemptsMade + 1 });
+      await processVideo(
+        { repo, storage, media, logger },
+        {
+          videoId,
+          attempt: job.attemptsMade + 1,
+          maxAttempts: job.opts.attempts ?? 1,
+        },
+      );
+    },
+    {
+      connection,
+      concurrency: cfg.concurrency,
+      // Transcodes longos: lock generoso e renovado a cada 1/3 do tempo (padrão do BullMQ).
+      lockDuration: cfg.lockDurationMs,
+    },
+  );
 
-interface VideoRow {
-  id: string;
-  channel_id: string;
-  original_key: string;
-}
-
-async function getVideo(id: string): Promise<VideoRow | undefined> {
-  const db = pg();
-  await db.connect();
-  const res = await db.query('SELECT * FROM videos WHERE id = $1', [id]);
-  await db.end();
-  return res.rows[0] as VideoRow | undefined;
-}
-
-async function downloadTo(key: string, dest: string): Promise<void> {
-  const out = await s3.send(new GetObjectCommand({ Bucket: BUCKET, Key: key }));
-  await pipeline(out.Body as Readable, createWriteStream(dest));
-}
-
-async function upload(key: string, path: string, contentType: string): Promise<void> {
-  await s3.send(
-    new PutObjectCommand({
-      Bucket: BUCKET,
-      Key: key,
-      Body: createReadStream(path),
-      ContentType: contentType,
+  worker.on('ready', () => logger.info(`ouvindo a fila '${cfg.queueName}'`, { concurrency: cfg.concurrency }));
+  worker.on('completed', (job) => logger.info('job concluído', { jobId: job.id }));
+  worker.on('failed', (job, err) =>
+    logger.error('job falhou', {
+      jobId: job?.id,
+      attemptsMade: job?.attemptsMade,
+      maxAttempts: job?.opts.attempts,
+      error: err.message,
     }),
   );
-}
+  worker.on('stalled', (jobId) => logger.warn('job travado (stalled); será reentregue', { jobId }));
+  worker.on('error', (err) => logger.error('erro no worker', { error: err.message }));
 
-function probeDuration(path: string): Promise<number> {
-  return new Promise((resolve) => {
-    ffmpeg.ffprobe(path, (err, data) => {
-      resolve(err ? 0 : Math.round(data?.format?.duration ?? 0));
-    });
-  });
-}
-
-function makeThumbnail(input: string, folder: string, filename: string): Promise<void> {
-  return new Promise((resolve, reject) => {
-    ffmpeg(input)
-      .on('end', () => resolve())
-      .on('error', reject)
-      .screenshots({ count: 1, timemarks: ['1'], folder, filename });
-  });
-}
-
-function transcode(input: string, output: string): Promise<void> {
-  return new Promise((resolve, reject) => {
-    ffmpeg(input)
-      .outputOptions(['-c:v libx264', '-c:a aac', '-movflags +faststart'])
-      .on('end', () => resolve())
-      .on('error', reject)
-      .save(output);
-  });
-}
-
-async function processVideo(videoId: string): Promise<void> {
-  const video = await getVideo(videoId);
-  if (!video) throw new Error(`vídeo ${videoId} não encontrado`);
-  await setStatus(videoId, { status: 'processing' });
-
-  const work = await fs.mkdtemp(join(tmpdir(), `vid-${videoId}-`));
-  const original = join(work, 'original');
-  const processed = join(work, 'processed.mp4');
-  const thumb = 'thumb.jpg';
-
-  try {
-    await downloadTo(video.original_key, original);
-    // valida que o download trouxe conteúdo antes de gastar CPU com FFmpeg
-    const stat = await fs.stat(original).catch(() => null);
-    if (!stat || stat.size === 0) {
-      throw new Error('arquivo original vazio ou não baixado do storage');
-    }
-
-    const duration = await probeDuration(original);
-    await makeThumbnail(original, work, thumb);
-    await transcode(original, processed);
-
-    const base = `videos/${video.channel_id}/${videoId}`;
-    const processed_key = `${base}/processed.mp4`;
-    const thumbnail_key = `${base}/thumb.jpg`;
-    await upload(processed_key, processed, 'video/mp4');
-    await upload(thumbnail_key, join(work, thumb), 'image/jpeg');
-
-    await setStatus(videoId, {
-      status: 'ready',
-      processed_key,
-      thumbnail_key,
-      duration_sec: duration,
-    });
-  } finally {
-    // limpa o diretório temporário mesmo em caso de erro (evita vazamento de disco)
-    await fs.rm(work, { recursive: true, force: true }).catch(() => undefined);
-  }
-}
-
-const worker = new Worker(
-  QUEUE,
-  async (job) => {
-    const { videoId } = job.data as { videoId: string };
-    console.log(`[worker] processando ${videoId} ...`);
+  let shuttingDown = false;
+  const shutdown = async (signal: string): Promise<void> => {
+    if (shuttingDown) return;
+    shuttingDown = true;
+    logger.info('encerrando', { signal });
     try {
-      await processVideo(videoId);
-      console.log(`[worker] ${videoId} pronto`);
+      // close() espera o job em andamento terminar (ou o lock expirar) antes de sair.
+      await worker.close();
+      await connection.quit();
+      await repo.close();
+      storage.destroy();
+      logger.info('encerrado');
+      process.exit(0);
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      console.error(`[worker] falha em ${videoId}:`, message);
-      await setStatus(videoId, { status: 'failed', error: message.slice(0, 500) });
-      throw err; // deixa o BullMQ reprocessar conforme os attempts
+      logger.error('erro ao encerrar', { error: err instanceof Error ? err.message : String(err) });
+      process.exit(1);
     }
-  },
-  { connection },
-);
+  };
+  process.on('SIGTERM', () => void shutdown('SIGTERM'));
+  process.on('SIGINT', () => void shutdown('SIGINT'));
+}
 
-worker.on('ready', () => console.log(`[worker] ouvindo a fila '${QUEUE}'`));
+main().catch((err: unknown) => {
+  process.stderr.write(`worker falhou ao iniciar: ${err instanceof Error ? err.stack ?? err.message : String(err)}\n`);
+  process.exit(1);
+});
