@@ -1,5 +1,8 @@
 import * as Joi from 'joi';
 
+const MiB = 1024 * 1024;
+const GiB = 1024 * MiB;
+
 export const envValidationSchema = Joi.object({
   NODE_ENV: Joi.string()
     .valid('development', 'production', 'test')
@@ -23,13 +26,23 @@ export const envValidationSchema = Joi.object({
   SWAGGER_ENABLED: Joi.string().valid('true', 'false').default('false'),
 
   // --- Fase 03: object storage (MinIO/S3) ---
-  S3_ENDPOINT: Joi.string().default('http://minio:9000'),
+  S3_ENDPOINT: Joi.string().uri().default('http://minio:9000'),
+  S3_PUBLIC_ENDPOINT: Joi.string().uri().default('http://localhost:9000'),
   S3_REGION: Joi.string().default('us-east-1'),
   S3_ACCESS_KEY: Joi.string().required(),
   S3_SECRET_KEY: Joi.string().required(),
   S3_BUCKET: Joi.string().default('streamtube-videos'),
   S3_FORCE_PATH_STYLE: Joi.string().valid('true', 'false').default('true'),
-  S3_PRESIGN_EXPIRES: Joi.number().default(3600),
+  S3_PRESIGN_EXPIRES: Joi.number().integer().min(60).default(3600),
+  S3_MULTIPART_THRESHOLD: Joi.number()
+    .integer()
+    .min(5 * MiB)
+    .default(100 * MiB),
+  S3_MULTIPART_PART_SIZE: Joi.number()
+    .integer()
+    .min(5 * MiB)
+    .max(5 * GiB)
+    .default(100 * MiB),
 
   // --- Fase 03: fila (Redis/BullMQ) ---
   REDIS_HOST: Joi.string().default('redis'),

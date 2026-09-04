@@ -6,15 +6,35 @@ import { randomUUID } from 'crypto';
 import { Video, VideoStatus } from './entities/video.entity';
 import { Channel } from '../channels/entities/channel.entity';
 import { CreateVideoDto } from './dto/create-video.dto';
-import { StorageService } from '../storage/storage.service';
+import { CompletedPart, StorageService } from '../storage/storage.service';
 import { VideoQueueService } from '../queue/video-queue.service';
+import { isPgUniqueViolationOnColumn } from '../common/database/pg-errors';
+import { generateVideoSlug } from './slug.util';
+import {
+  buildVideoKeyPrefix,
+  VIDEO_SLUG_COLUMN,
+  VIDEO_SLUG_MAX_RETRIES,
+  VIDEO_STORAGE_KEYS,
+} from './videos.constants';
+import type { RegisteredVideo, UploadPlan } from './videos.types';
 import {
   ChannelNotFoundException,
   VideoChannelForbiddenException,
+  VideoInvalidStateException,
   VideoNotFoundException,
   VideoNotReadyException,
   VideoUploadNotConfirmedException,
 } from './video.exceptions';
+
+/** Estados a partir dos quais o cliente ainda pode confirmar/cancelar o upload. */
+const CONFIRMABLE = [VideoStatus.UPLOADING] as const;
+/** Estados em que a exclusão é segura (o worker não está mexendo nos objetos). */
+const DELETABLE = [
+  VideoStatus.UPLOADING,
+  VideoStatus.UPLOADED,
+  VideoStatus.READY,
+  VideoStatus.FAILED,
+] as const;
 
 @Injectable()
 export class VideosService {
@@ -32,40 +52,80 @@ export class VideosService {
     return channel;
   }
 
+  private assertStatus(video: Video, allowed: readonly VideoStatus[]): void {
+    if (!allowed.includes(video.status)) {
+      throw new VideoInvalidStateException(video.status, allowed);
+    }
+  }
+
   /**
    * Registra o vídeo (status uploading) e devolve o plano de upload:
    * - `single`: uma URL pré-assinada (PUT direto) para arquivos pequenos;
    * - `multipart`: uploadId + URLs por parte, para arquivos grandes (até 10GB).
-   * A escolha usa o tamanho declarado (`sizeBytes`) vs o threshold do storage.
+   * O plano é gerado ANTES de persistir: se o storage falhar, nada fica órfão no banco.
    */
-  async register(userId: string, dto: CreateVideoDto) {
+  async register(
+    userId: string,
+    dto: CreateVideoDto,
+  ): Promise<RegisteredVideo> {
     const channel = await this.myChannel(userId);
     const id = randomUUID();
-    const original_key = `videos/${channel.id}/${id}/original`;
-    const video = this.repo.create({
-      id,
-      channel_id: channel.id,
-      title: dto.title,
-      description: dto.description ?? null,
-      status: VideoStatus.UPLOADING,
-      original_key,
-    });
-    await this.repo.save(video);
+    const original_key = `${buildVideoKeyPrefix(channel.id, id)}/${VIDEO_STORAGE_KEYS.ORIGINAL}`;
 
-    if (dto.sizeBytes && this.storage.needsMultipart(dto.sizeBytes)) {
-      const plan = await this.storage.createMultipartUpload(
+    const upload = await this.planUpload(original_key, dto.sizeBytes);
+    try {
+      const video = await this.saveWithUniqueSlug({
+        id,
+        channel_id: channel.id,
+        title: dto.title,
+        description: dto.description ?? null,
+        status: VideoStatus.UPLOADING,
         original_key,
-        dto.sizeBytes,
-      );
-      return { video, upload: { type: 'multipart' as const, ...plan } };
+      });
+      return { video, upload };
+    } catch (err) {
+      if (upload.type === 'multipart') {
+        await this.storage.abortMultipartUpload(original_key, upload.uploadId);
+      }
+      throw err;
     }
-    const url = await this.storage.createPresignedUpload(original_key);
-    return { video, upload: { type: 'single' as const, url } };
+  }
+
+  private async planUpload(
+    key: string,
+    sizeBytes: number | undefined,
+  ): Promise<UploadPlan> {
+    if (sizeBytes && this.storage.needsMultipart(sizeBytes)) {
+      const plan = await this.storage.createMultipartUpload(key, sizeBytes);
+      return { type: 'multipart', ...plan };
+    }
+    const url = await this.storage.createPresignedUpload(key);
+    return { type: 'single', url };
+  }
+
+  /** Persiste o vídeo gerando um slug novo a cada colisão de unicidade (raríssima). */
+  private async saveWithUniqueSlug(
+    data: Omit<Partial<Video>, 'slug'>,
+  ): Promise<Video> {
+    let lastError: unknown;
+    for (let attempt = 0; attempt < VIDEO_SLUG_MAX_RETRIES; attempt++) {
+      const video = this.repo.create({ ...data, slug: generateVideoSlug() });
+      try {
+        return await this.repo.save(video);
+      } catch (err) {
+        if (!isPgUniqueViolationOnColumn(err, VIDEO_SLUG_COLUMN)) throw err;
+        lastError = err;
+      }
+    }
+    throw lastError instanceof Error
+      ? lastError
+      : new Error('Não foi possível gerar um slug único para o vídeo');
   }
 
   /** Confirma o upload (single PUT): valida o objeto, muda para uploaded e enfileira. */
   async confirmUpload(userId: string, id: string): Promise<Video> {
     const video = await this.getOwned(userId, id);
+    this.assertStatus(video, CONFIRMABLE);
     return this.markUploadedAndEnqueue(video);
   }
 
@@ -74,9 +134,10 @@ export class VideosService {
     userId: string,
     id: string,
     uploadId: string,
-    parts: { partNumber: number; etag: string }[],
+    parts: CompletedPart[],
   ): Promise<Video> {
     const video = await this.getOwned(userId, id);
+    this.assertStatus(video, CONFIRMABLE);
     await this.storage.completeMultipartUpload(
       video.original_key,
       uploadId,
@@ -85,14 +146,29 @@ export class VideosService {
     return this.markUploadedAndEnqueue(video);
   }
 
-  /** Cancela um upload multipart em andamento. */
+  /** Cancela um upload multipart em andamento e descarta o registro (nunca foi enviado). */
   async abortMultipart(
     userId: string,
     id: string,
     uploadId: string,
   ): Promise<void> {
     const video = await this.getOwned(userId, id);
+    this.assertStatus(video, CONFIRMABLE);
     await this.storage.abortMultipartUpload(video.original_key, uploadId);
+    await this.repo.remove(video);
+  }
+
+  /** Exclui o vídeo do canal do usuário: objetos no storage primeiro, depois a linha. */
+  async delete(userId: string, id: string): Promise<void> {
+    const video = await this.getOwned(userId, id);
+    this.assertStatus(video, DELETABLE);
+    const keys = [
+      video.original_key,
+      video.processed_key,
+      video.thumbnail_key,
+    ].filter((k): k is string => typeof k === 'string' && k.length > 0);
+    await this.storage.deleteObjects(keys);
+    await this.repo.remove(video);
   }
 
   private async markUploadedAndEnqueue(video: Video): Promise<Video> {
@@ -123,17 +199,31 @@ export class VideosService {
   async getOwned(userId: string, id: string): Promise<Video> {
     const channel = await this.myChannel(userId);
     const video = await this.get(id);
-    if (video.channel_id !== channel.id)
+    if (video.channel_id !== channel.id) {
       throw new VideoChannelForbiddenException();
+    }
     return video;
   }
 
-  /** Retorna a chave streamável somente se o vídeo estiver pronto. */
-  async readyKey(id: string): Promise<{ video: Video; key: string }> {
-    const video = await this.get(id);
+  /**
+   * Retorna a chave streamável do vídeo do próprio canal, somente se estiver pronto.
+   * Acesso público/anônimo fica para a fase da página de visualização.
+   */
+  async readyKey(
+    userId: string,
+    id: string,
+  ): Promise<{ video: Video; key: string }> {
+    const video = await this.getOwned(userId, id);
     if (video.status !== VideoStatus.READY || !video.processed_key) {
       throw new VideoNotReadyException();
     }
     return { video, key: video.processed_key };
+  }
+
+  /** Chave da thumbnail gerada pelo worker (dono do canal). */
+  async thumbnailKey(userId: string, id: string): Promise<string> {
+    const video = await this.getOwned(userId, id);
+    if (!video.thumbnail_key) throw new VideoNotReadyException();
+    return video.thumbnail_key;
   }
 }

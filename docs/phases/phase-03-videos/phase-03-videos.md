@@ -125,6 +125,7 @@ Redis aceita conexão; sem `S3_ACCESS_KEY` o bootstrap falha na validação Joi.
 | Coluna | Tipo | Notas |
 |---|---|---|
 | id | uuid (pk) | |
+| slug | varchar(11) unique | URL curta (alfabeto URL-safe, CSPRNG), migration `AddVideoSlug` |
 | channelId | uuid (fk → channels.id) | índice |
 | title | varchar | |
 | description | text | nullable |
@@ -137,33 +138,47 @@ Redis aceita conexão; sem `S3_ACCESS_KEY` o bootstrap falha na validação Joi.
 | error | text | nullable — último erro do worker |
 | createdAt / updatedAt | timestamptz | |
 
-### API Contracts
+### API Contracts (estado após a Etapa 1 do plano de evolução)
 
-| Método | Rota | Auth | Descrição |
+Todas as rotas exigem JWT (guard global) e, nesta fase, **o usuário ser dono do canal do vídeo**.
+Leitura pública/anônima fica para a Fase 05. IDs são validados como UUID (400 se inválido).
+Respostas usam `VideoResponseDto` (nunca expõem chaves do storage; `error` só para o dono).
+
+| Método | Rota | Sucesso | Descrição |
 |---|---|---|---|
-| POST | `/channels/:channelId/videos` | JWT + dono | registra vídeo → `{ video, uploadUrl }` |
-| POST | `/videos/:id/confirm` | JWT + dono | confirma upload → enfileira, `uploaded` |
-| GET | `/videos/:id` | JWT | metadados/status |
-| GET | `/channels/:channelId/videos` | JWT | lista do canal |
-| GET | `/videos/:id/stream` | JWT | streaming (Range → 206) |
-| GET | `/videos/:id/download` | JWT | download (presigned/attachment) |
+| POST | `/videos` | 201 `{ video, upload }` | registra rascunho + plano de upload `single` (URL) ou `multipart` (`uploadId`, `partSize`, `parts[]`) conforme `sizeBytes` (máx. 10GB) |
+| POST | `/videos/:id/confirm` | 200 `video` | `uploading → uploaded`, valida objeto no storage, enfileira |
+| POST | `/videos/:id/multipart/complete` | 200 `video` | monta o objeto (ETags), `uploading → uploaded`, enfileira |
+| POST | `/videos/:id/multipart/abort` | 204 | cancela o multipart e remove o registro |
+| DELETE | `/videos/:id` | 204 | remove objetos do storage e o registro (não permitido em `processing`) |
+| GET | `/videos` | 200 `video[]` | meus vídeos, mais recentes primeiro |
+| GET | `/videos/:id` | 200 `video` | metadados/status/`slug`/`thumbnailUrl` |
+| GET | `/videos/:id/thumbnail` | 302 | redirect para URL pré-assinada da thumbnail |
+| GET | `/videos/:id/stream` | 200 / 206 | MP4 processado; `Range` → 206 + `Content-Range`; inválido → 416 |
+| GET | `/videos/:id/download` | 302 | redirect para URL pré-assinada do MP4 |
+
+URLs pré-assinadas são geradas com `S3_PUBLIC_ENDPOINT` (host/navegador), enquanto a API fala
+com o storage por `S3_ENDPOINT` (rede Docker).
 
 ### Authorization Matrix
 
 | Ação | Regra |
 |---|---|
-| registrar / confirmar / excluir | usuário == dono do canal do vídeo |
-| stream / download / consultar | usuário autenticado (fase atual); visibilidade pública fica p/ fase futura |
+| registrar / confirmar / completar / cancelar / excluir | usuário == dono do canal do vídeo |
+| consultar / listar / thumbnail / stream / download | usuário == dono do canal (fase atual); visibilidade pública/unlisted fica para a Fase 05 |
 
 ### Error Catalog (`VIDEO_*`)
 
 | Código | HTTP | Quando |
 |---|---|---|
 | `VIDEO_NOT_FOUND` | 404 | id inexistente |
+| `VIDEO_CHANNEL_NOT_FOUND` | 404 | usuário autenticado sem canal |
 | `VIDEO_CHANNEL_FORBIDDEN` | 403 | usuário não é dono do canal |
-| `VIDEO_NOT_READY` | 409 | stream/download antes de `ready` |
+| `VIDEO_INVALID_STATE` | 409 | operação incompatível com o status (reconfirmar, cancelar após confirmar, excluir em `processing`) |
+| `VIDEO_NOT_READY` | 409 | stream/download/thumbnail antes de `ready` |
 | `VIDEO_UPLOAD_NOT_CONFIRMED` | 409 | confirmar sem objeto no storage |
-| `VIDEO_INVALID_RANGE` | 416 | Range fora dos limites |
+| `VIDEO_INVALID_RANGE` | 416 | Range malformado ou fora dos limites (`Content-Range: bytes */total`) |
+| `VALIDATION_ERROR` | 400 | DTO inválido ou id fora do formato UUID |
 
 ### Events / Messages (fila `video-processing`)
 

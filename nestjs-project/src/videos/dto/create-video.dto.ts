@@ -3,44 +3,46 @@ import {
   IsInt,
   IsOptional,
   IsString,
+  Max,
   MaxLength,
   Min,
   MinLength,
 } from 'class-validator';
+import {
+  VIDEO_DESCRIPTION_MAX_LENGTH,
+  VIDEO_MAX_SIZE_BYTES,
+  VIDEO_TITLE_MAX_LENGTH,
+} from '../videos.constants';
 
 export class CreateVideoDto {
-  @ApiProperty({ example: 'Meu primeiro vídeo' })
+  @ApiProperty({
+    example: 'Meu primeiro vídeo',
+    maxLength: VIDEO_TITLE_MAX_LENGTH,
+  })
   @IsString()
   @MinLength(1)
-  @MaxLength(200)
+  @MaxLength(VIDEO_TITLE_MAX_LENGTH)
   title: string;
 
-  @ApiPropertyOptional({ example: 'Descrição do vídeo' })
+  @ApiPropertyOptional({
+    example: 'Descrição do vídeo',
+    maxLength: VIDEO_DESCRIPTION_MAX_LENGTH,
+  })
   @IsOptional()
   @IsString()
-  @MaxLength(5000)
+  @MaxLength(VIDEO_DESCRIPTION_MAX_LENGTH)
   description?: string;
 
   @ApiPropertyOptional({
     description:
-      'Tamanho declarado do arquivo em bytes. Acima do threshold, o upload usa multipart (até 10GB).',
+      'Tamanho declarado do arquivo em bytes (máx. 10GB). Acima do threshold do storage o upload usa multipart.',
     example: 5_000_000,
+    minimum: 1,
+    maximum: VIDEO_MAX_SIZE_BYTES,
   })
   @IsOptional()
   @IsInt()
   @Min(1)
+  @Max(VIDEO_MAX_SIZE_BYTES)
   sizeBytes?: number;
-}
-
-export class CompleteMultipartDto {
-  @ApiProperty()
-  @IsString()
-  uploadId: string;
-
-  @ApiProperty({
-    description:
-      'Partes enviadas, com partNumber e ETag retornado pelo storage.',
-    example: [{ partNumber: 1, etag: '"abc"' }],
-  })
-  parts: { partNumber: number; etag: string }[];
 }

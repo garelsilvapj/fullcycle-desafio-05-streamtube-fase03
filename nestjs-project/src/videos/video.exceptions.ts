@@ -49,3 +49,13 @@ export class ChannelNotFoundException extends DomainException {
     super('VIDEO_CHANNEL_NOT_FOUND', 404, 'Canal do usuário não encontrado');
   }
 }
+
+export class VideoInvalidStateException extends DomainException {
+  constructor(current: string, allowed: readonly string[]) {
+    super(
+      'VIDEO_INVALID_STATE',
+      409,
+      `Operação não permitida no estado '${current}' (esperado: ${allowed.join(' | ')})`,
+    );
+  }
+}

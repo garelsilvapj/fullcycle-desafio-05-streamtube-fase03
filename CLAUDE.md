@@ -38,9 +38,14 @@ Ciclo completo de upload e processamento de vídeos. Ver
 - **Worker**: `worker/` (processo separado com FFmpeg) consome `video-processing`, gera thumbnail +
   MP4 H.264/AAC, atualiza o vídeo (`processing → ready|failed`).
 - **Estados**: `uploading → uploaded → processing → ready | failed` (`src/videos/entities/video.entity.ts`).
-- **Endpoints** (`src/videos/videos.controller.ts`, protegidos pelo JwtAuthGuard global; canal
-  resolvido do usuário): `POST /videos`, `POST /videos/:id/confirm`, `GET /videos`,
-  `GET /videos/:id`, `GET /videos/:id/stream` (Range→206), `GET /videos/:id/download`.
+- **Endpoints** (`src/videos/videos.controller.ts`, protegidos pelo JwtAuthGuard global; todas
+  as rotas exigem ser dono do canal nesta fase): `POST /videos` (plano `single`/`multipart`),
+  `POST /videos/:id/confirm`, `POST /videos/:id/multipart/{complete,abort}`, `DELETE /videos/:id`,
+  `GET /videos`, `GET /videos/:id`, `GET /videos/:id/thumbnail`, `GET /videos/:id/stream`
+  (Range→206/416), `GET /videos/:id/download`. Respostas via `VideoResponseDto` (sem chaves do
+  storage). URL curta única em `video.slug` (`slug.util.ts`).
+- **Presign**: `S3_PUBLIC_ENDPOINT` assina as URLs entregues ao cliente; `S3_ENDPOINT` é o
+  endpoint interno usado pela API.
 - **Erros**: catálogo `VIDEO_*` (`src/videos/video.exceptions.ts`) via `DomainException` + filtro global.
 - **Infra**: `nestjs-project/compose.yaml` sobe db, mailpit, `redis`, `minio` (+ `createbuckets`) e `worker`.
 
