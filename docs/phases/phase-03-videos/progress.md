@@ -31,7 +31,7 @@ worker), CI e ausência da fatia frontend. O fechamento segue as etapas do plano
 | 0 | Verdade do repositório e higiene (docs, `worker/worker/`, `.gitignore`, `.env.example`) | ✅ feito (2026-09-04) |
 | 1 | Hardening do backend (endpoint público de assinatura, response DTO, autorização, estados, `DELETE`, slug, OpenAPI) | ✅ feito (2026-09-04) — 71 testes unitários em videos/storage/queue; `openapi.json` regenerado |
 | 2 | Worker resiliente (módulos, política de falha, shutdown, Dockerfile, testes) | ✅ feito (2026-09-04) — 17 testes (Vitest; FFmpeg real na imagem `--target test`) |
-| 3 | Testes de integração e e2e (vídeos, storage, fila, migrations) | ⏳ |
+| 3 | Testes de integração e e2e (vídeos, storage, fila, migrations) | ✅ feito (2026-09-04) — 252 unit+integração e 69 e2e verdes (`--runInBand`) |
 | 4 | Validação funcional local (`scripts/smoke-videos.sh` + `manual-validation.md`) | ⏳ |
 | 5 | CI completa (unit, integração/e2e com serviços, worker, frontend, openapi-freshness) | ⏳ |
 | 6 | Fatia `phase-03-videos-frontend` (upload, meus vídeos, player) | ⏳ |
