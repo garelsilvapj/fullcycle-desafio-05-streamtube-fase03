@@ -32,7 +32,12 @@ export class VideosService {
     return channel;
   }
 
-  /** Registra o vídeo (status uploading) e devolve a URL pré-assinada de upload. */
+  /**
+   * Registra o vídeo (status uploading) e devolve o plano de upload:
+   * - `single`: uma URL pré-assinada (PUT direto) para arquivos pequenos;
+   * - `multipart`: uploadId + URLs por parte, para arquivos grandes (até 10GB).
+   * A escolha usa o tamanho declarado (`sizeBytes`) vs o threshold do storage.
+   */
   async register(userId: string, dto: CreateVideoDto) {
     const channel = await this.myChannel(userId);
     const id = randomUUID();
@@ -46,13 +51,51 @@ export class VideosService {
       original_key,
     });
     await this.repo.save(video);
-    const uploadUrl = await this.storage.createPresignedUpload(original_key);
-    return { video, uploadUrl };
+
+    if (dto.sizeBytes && this.storage.needsMultipart(dto.sizeBytes)) {
+      const plan = await this.storage.createMultipartUpload(
+        original_key,
+        dto.sizeBytes,
+      );
+      return { video, upload: { type: 'multipart' as const, ...plan } };
+    }
+    const url = await this.storage.createPresignedUpload(original_key);
+    return { video, upload: { type: 'single' as const, url } };
   }
 
-  /** Confirma o upload: valida o objeto no storage, muda para uploaded e enfileira. */
+  /** Confirma o upload (single PUT): valida o objeto, muda para uploaded e enfileira. */
   async confirmUpload(userId: string, id: string): Promise<Video> {
     const video = await this.getOwned(userId, id);
+    return this.markUploadedAndEnqueue(video);
+  }
+
+  /** Finaliza um upload multipart: monta o objeto no storage, confirma e enfileira. */
+  async completeMultipart(
+    userId: string,
+    id: string,
+    uploadId: string,
+    parts: { partNumber: number; etag: string }[],
+  ): Promise<Video> {
+    const video = await this.getOwned(userId, id);
+    await this.storage.completeMultipartUpload(
+      video.original_key,
+      uploadId,
+      parts,
+    );
+    return this.markUploadedAndEnqueue(video);
+  }
+
+  /** Cancela um upload multipart em andamento. */
+  async abortMultipart(
+    userId: string,
+    id: string,
+    uploadId: string,
+  ): Promise<void> {
+    const video = await this.getOwned(userId, id);
+    await this.storage.abortMultipartUpload(video.original_key, uploadId);
+  }
+
+  private async markUploadedAndEnqueue(video: Video): Promise<Video> {
     const head = await this.storage.head(video.original_key);
     if (!head) throw new VideoUploadNotConfirmedException();
     video.status = VideoStatus.UPLOADED;

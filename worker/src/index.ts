@@ -129,24 +129,34 @@ async function processVideo(videoId: string): Promise<void> {
   const processed = join(work, 'processed.mp4');
   const thumb = 'thumb.jpg';
 
-  await downloadTo(video.original_key, original);
-  const duration = await probeDuration(original);
-  await makeThumbnail(original, work, thumb);
-  await transcode(original, processed);
+  try {
+    await downloadTo(video.original_key, original);
+    // valida que o download trouxe conteúdo antes de gastar CPU com FFmpeg
+    const stat = await fs.stat(original).catch(() => null);
+    if (!stat || stat.size === 0) {
+      throw new Error('arquivo original vazio ou não baixado do storage');
+    }
 
-  const base = `videos/${video.channel_id}/${videoId}`;
-  const processed_key = `${base}/processed.mp4`;
-  const thumbnail_key = `${base}/thumb.jpg`;
-  await upload(processed_key, processed, 'video/mp4');
-  await upload(thumbnail_key, join(work, thumb), 'image/jpeg');
+    const duration = await probeDuration(original);
+    await makeThumbnail(original, work, thumb);
+    await transcode(original, processed);
 
-  await setStatus(videoId, {
-    status: 'ready',
-    processed_key,
-    thumbnail_key,
-    duration_sec: duration,
-  });
-  await fs.rm(work, { recursive: true, force: true });
+    const base = `videos/${video.channel_id}/${videoId}`;
+    const processed_key = `${base}/processed.mp4`;
+    const thumbnail_key = `${base}/thumb.jpg`;
+    await upload(processed_key, processed, 'video/mp4');
+    await upload(thumbnail_key, join(work, thumb), 'image/jpeg');
+
+    await setStatus(videoId, {
+      status: 'ready',
+      processed_key,
+      thumbnail_key,
+      duration_sec: duration,
+    });
+  } finally {
+    // limpa o diretório temporário mesmo em caso de erro (evita vazamento de disco)
+    await fs.rm(work, { recursive: true, force: true }).catch(() => undefined);
+  }
 }
 
 const worker = new Worker(

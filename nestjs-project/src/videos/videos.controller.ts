@@ -11,7 +11,7 @@ import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import type { Response } from 'express';
 
 import { VideosService } from './videos.service';
-import { CreateVideoDto } from './dto/create-video.dto';
+import { CompleteMultipartDto, CreateVideoDto } from './dto/create-video.dto';
 import { StorageService } from '../storage/storage.service';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { JwtPayload } from '../auth/auth.types';
@@ -37,6 +37,27 @@ export class VideosController {
   @Post(':id/confirm')
   confirm(@CurrentUser() user: JwtPayload, @Param('id') id: string) {
     return this.videos.confirmUpload(user.sub, id);
+  }
+
+  /** Finaliza um upload multipart (arquivos grandes) e enfileira o processamento. */
+  @Post(':id/multipart/complete')
+  completeMultipart(
+    @CurrentUser() user: JwtPayload,
+    @Param('id') id: string,
+    @Body() dto: CompleteMultipartDto,
+  ) {
+    return this.videos.completeMultipart(user.sub, id, dto.uploadId, dto.parts);
+  }
+
+  /** Cancela um upload multipart em andamento. */
+  @Post(':id/multipart/abort')
+  async abortMultipart(
+    @CurrentUser() user: JwtPayload,
+    @Param('id') id: string,
+    @Body('uploadId') uploadId: string,
+  ) {
+    await this.videos.abortMultipart(user.sub, id, uploadId);
+    return { aborted: true };
   }
 
   @Get()
