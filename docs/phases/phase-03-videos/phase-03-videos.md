@@ -184,6 +184,22 @@ SI-03.1 (infra/config)
                                            └─► SI-03.7 (worker FFmpeg) ─► SI-03.8 (wiring/CLAUDE.md)
 ```
 
+## Addendum — Upload multipart (até 10GB)
+
+Um único `PutObject` pré-assinado é limitado a **5GB** no S3/MinIO; o brief pede **até 10GB**.
+Por isso o `POST /videos` decide o modo de upload pelo tamanho declarado (`sizeBytes`) vs o
+threshold (`S3_MULTIPART_THRESHOLD`, default 100MB):
+
+- **single** (arquivo pequeno): resposta `{ video, upload: { type: 'single', url } }`; o cliente faz
+  `PUT` na `url` e chama `POST /videos/:id/confirm`.
+- **multipart** (arquivo grande): resposta `{ video, upload: { type: 'multipart', uploadId, partSize,
+  parts: [{ partNumber, url }] } }`; o cliente sobe cada parte (`PUT` na url), coleta os `ETag` e
+  chama `POST /videos/:id/multipart/complete { uploadId, parts }`. Para cancelar:
+  `POST /videos/:id/multipart/abort { uploadId }`.
+
+`StorageService` ganhou `createMultipartUpload`, `completeMultipartUpload`, `abortMultipartUpload`
+e `needsMultipart`. Testado em `videos.service.spec.ts` (single vs multipart, complete, abort).
+
 ## Deliverables
 
 - Módulo `src/videos/` (entity, dto, service, controller, module) + migration.
