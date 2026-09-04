@@ -51,7 +51,7 @@ describe('StorageService', () => {
     );
     send = jest
       .spyOn(S3Client.prototype, 'send')
-      .mockResolvedValue({} as never);
+      .mockResolvedValue({} as never) as unknown as SendMock;
   });
 
   afterEach(() => send.mockRestore());
