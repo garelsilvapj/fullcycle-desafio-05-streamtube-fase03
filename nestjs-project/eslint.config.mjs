@@ -32,4 +32,17 @@ export default tseslint.config(
       "prettier/prettier": ["error", { endOfLine: "auto" }],
     },
   },
+  {
+    // Testes lidam com `any` vindo de supertest (res.body) e de mocks do Jest por natureza;
+    // manter como aviso evita que a suíte de lint bloqueie por tipagem de fixtures.
+    files: ['**/*.spec.ts', '**/*.integration-spec.ts', 'test/**/*.ts'],
+    rules: {
+      '@typescript-eslint/no-unsafe-member-access': 'warn',
+      '@typescript-eslint/no-unsafe-assignment': 'warn',
+      '@typescript-eslint/no-unsafe-return': 'warn',
+      '@typescript-eslint/no-unsafe-call': 'warn',
+      // `expect(mock.method)` é o idioma do Jest; não há `this` a preservar.
+      '@typescript-eslint/unbound-method': 'off',
+    },
+  },
 );
