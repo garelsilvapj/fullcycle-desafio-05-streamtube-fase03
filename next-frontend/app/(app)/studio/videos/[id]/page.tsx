@@ -36,6 +36,11 @@ export default async function StudioVideoPage({ params }: { params: Promise<{ id
           <Button asChild variant="outline" size="sm">
             <Link href={`/videos/${video.id}`}>Ver vídeo</Link>
           </Button>
+          {video.isPublished && (
+            <Button asChild variant="outline" size="sm">
+              <Link href={`/watch/${video.slug}`}>Ver como público</Link>
+            </Button>
+          )}
         </div>
       </div>
 

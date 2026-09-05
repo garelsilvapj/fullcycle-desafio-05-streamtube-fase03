@@ -35,8 +35,8 @@ describe("GET /api/videos/:id/download and /thumbnail", () => {
     expect(thumb.headers.get("location")).toContain("thumb.jpg");
   });
 
-  it("passes 404 through and returns 401 without a session", async () => {
-    expect((await download(req(), params(VIDEO_FIXTURE_ID))).status).toBe(401);
+  it("is public (Fase 05) and passes 404 through", async () => {
+    expect((await download(req(), params(VIDEO_FIXTURE_ID))).status).toBe(302);
     await loginFixture();
     expect((await download(req(), params(MISSING_VIDEO_ID))).status).toBe(404);
   });

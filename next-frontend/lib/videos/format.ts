@@ -38,3 +38,11 @@ export function formatRelative(iso: string | null, now: Date = new Date()): stri
   }
   return `há ${value} ${value === 1 ? "ano" : "anos"}`
 }
+
+/** Data/hora determinística (UTC) — igual no servidor e no navegador, sem risco de hidratação. */
+export function formatDateTimeUtc(iso: string | null): string {
+  if (!iso) return "—"
+  const d = new Date(iso)
+  const pad = (n: number) => String(n).padStart(2, "0")
+  return `${pad(d.getUTCDate())}/${pad(d.getUTCMonth() + 1)}/${d.getUTCFullYear()} ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())} UTC`
+}

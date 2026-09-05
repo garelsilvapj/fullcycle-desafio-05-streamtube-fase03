@@ -1,6 +1,6 @@
 import "server-only";
 
-import { withAuth } from "@/lib/api/authorized";
+import { withAuth, withOptionalAuth } from "@/lib/api/authorized";
 import type {
   Category,
   Channel,
@@ -8,6 +8,7 @@ import type {
   PaginatedVideos,
   PublicChannel,
   PublicChannelVideos,
+  RelatedVideos,
   Video,
 } from "@/lib/api/contracts";
 import { upstream } from "@/lib/api/upstream";
@@ -75,5 +76,23 @@ export async function listPublicChannelVideos(
   });
   if (response.status === 404) return "not-found";
   if (error || !data) throw new Error(`Falha ao listar vídeos do canal (${response.status})`);
+  return data;
+}
+
+/** Vídeo público pela URL única (auth opcional: o dono vê rascunhos). */
+export async function getVideoBySlug(slug: string): Promise<Video | "not-found"> {
+  const { data, error, response } = await withOptionalAuth((auth) =>
+    upstream.GET("/videos/slug/{slug}", { params: { path: { slug } }, headers: auth }),
+  );
+  if (response.status === 404) return "not-found";
+  if (error || !data) throw new Error(`Falha ao carregar o vídeo (${response.status})`);
+  return data;
+}
+
+export async function listRelatedVideos(id: string, limit = 8): Promise<RelatedVideos> {
+  const { data, error, response } = await upstream.GET("/videos/{id}/related", {
+    params: { path: { id }, query: { limit } },
+  });
+  if (error || !data) throw new Error(`Falha ao listar sugestões (${response.status})`);
   return data;
 }

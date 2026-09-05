@@ -1,12 +1,10 @@
 import Image from "next/image"
+import Link from "next/link"
 
 import type { PublicChannelVideos } from "@/lib/api/contracts"
 import { formatDuration, formatRelative } from "@/lib/videos/format"
 
-/**
- * Grid público dos vídeos publicados de um canal. Sem link para a página de visualização
- * (chega na Fase 05 com `/watch/[slug]`).
- */
+/** Grid público dos vídeos publicados de um canal; cada card abre `/watch/[slug]`. */
 function PublicVideoGrid({ data }: { data: PublicChannelVideos }) {
   if (data.total === 0) {
     return (
@@ -18,7 +16,8 @@ function PublicVideoGrid({ data }: { data: PublicChannelVideos }) {
   return (
     <ul data-slot="public-video-grid" className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
       {data.items.map((video) => (
-        <li key={video.id} data-slot="public-video-card" className="flex flex-col gap-2">
+        <li key={video.id} data-slot="public-video-card">
+          <Link href={`/watch/${video.slug}`} className="flex flex-col gap-2 rounded-[var(--radius-2)] hover:bg-muted/40">
           <div className="relative aspect-video w-full overflow-hidden rounded-[var(--radius-2)] bg-muted">
             {video.thumbnailUrl && (
               <Image src={`/api/videos/${video.id}/thumbnail`} alt="" fill unoptimized className="object-cover" />
@@ -32,6 +31,7 @@ function PublicVideoGrid({ data }: { data: PublicChannelVideos }) {
             {video.viewsCount} visualizações · {formatRelative(video.publishedAt)}
             {video.category ? ` · ${video.category.name}` : ""}
           </p>
+          </Link>
         </li>
       ))}
     </ul>

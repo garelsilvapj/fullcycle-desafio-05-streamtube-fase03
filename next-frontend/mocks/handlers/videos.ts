@@ -22,6 +22,9 @@ export const PROCESSING_VIDEO_ID = "22222222-2222-4222-8222-222222222222";
 export const FAILED_VIDEO_ID = "33333333-3333-4333-8333-333333333333";
 export const UNCONFIRMED_VIDEO_ID = "00000000-0000-4000-8000-000000000409";
 export const BAD_REQUEST_TITLE = "badrequest";
+export const DRAFT_SLUG = "draft000000";
+export const UNLISTED_SLUG = "unListEd001";
+export const RELATED_VIDEO_ID = "44444444-4444-4444-8444-444444444444";
 /** Títulos contendo esta marca registram um vídeo que fica em `processing` (para testar polling). */
 export const PROCESSING_TITLE_MARK = "[processing]";
 const MULTIPART_THRESHOLD = 100 * 1024 * 1024;
@@ -207,6 +210,38 @@ export const handlers = [
       }),
       { status: 201 },
     );
+  }),
+
+  // GET /videos/slug/:slug — público; slug reservado "draft000000" → 404
+  http.get(`${env.API_URL}/videos/slug/:slug`, ({ params }) => {
+    const slug = String(params.slug);
+    if (slug === DRAFT_SLUG) {
+      return HttpResponse.json(errorEnvelope(404, "VIDEO_NOT_FOUND", "Vídeo não encontrado"), { status: 404 });
+    }
+    const match = buildVideoList().find((v) => v.slug === slug);
+    const video = match ?? buildVideo({ slug, visibility: slug === UNLISTED_SLUG ? "unlisted" : "public" });
+    const { error: _error, ...pub } = video;
+    void _error;
+    return HttpResponse.json<VideoOk>({
+      ...pub,
+      channel: { id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", nickname: "alice", name: "Alice" },
+    } as VideoOk);
+  }),
+
+  // GET /videos/:id/related
+  http.get(`${env.API_URL}/videos/:id/related`, ({ params }) => {
+    const out = videoById(String(params.id));
+    if ("error" in out) return out.error;
+    return HttpResponse.json<VideoOk[]>([
+      buildVideo({ id: RELATED_VIDEO_ID, slug: "rElAtEd0001", title: "Vídeo relacionado" }),
+    ]);
+  }),
+
+  // POST /videos/:id/views
+  http.post(`${env.API_URL}/videos/:id/views`, ({ params }) => {
+    const out = videoById(String(params.id));
+    if ("error" in out) return out.error;
+    return new HttpResponse(null, { status: 204 });
   }),
 
   // GET /videos/:id

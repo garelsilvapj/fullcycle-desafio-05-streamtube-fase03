@@ -68,6 +68,19 @@ Ver `docs/decisions/technical-decisions-phase-04-management.md` e `docs/phases/p
 - **Frontend**: `/studio` (painel), `/studio/videos/[id]`, `/studio/channel`, `/c/[nickname]` (público);
   BFF em `app/api/{categories,channels,videos}/**` com `withAuth`/`withOptionalAuth` (`lib/api/authorized.ts`).
 
+## Página de Visualização (Fase 05)
+
+Ver `docs/decisions/technical-decisions-phase-05-watch.md` e `docs/phases/phase-05-watch/`.
+
+- **Visibilidade**: `VideosService.getViewable(userId|null, id)` = dono **ou** publicado (`published_at` + `ready`);
+  não visível → 404 (não revela). `readyKey`, `thumbnailKey`, `getViewableBySlug` usam essa regra.
+- **Endpoints públicos** (`@Public()` + auth opcional): `GET /videos/slug/:slug`, `GET /videos/:id/{stream,download,thumbnail}`,
+  `POST /videos/:id/views` (incremento atômico), `GET /videos/:id/related?limit` (mesma categoria, fallback recentes).
+- **Frontend**: `/watch/[slug]` (RSC pública) com `VideoPlayer` (proxy BFF com Range), `ViewTracker` (1 POST no
+  primeiro `play`), `WatchDescription` (expandir/recolher), `RelatedVideosList`; BFF `app/api/videos/slug/[slug]`,
+  `app/api/videos/[id]/{related,views}`; stream/download/thumbnail do BFF usam `withOptionalAuth`.
+- **MSW**: o dev server carrega os handlers só no boot (`instrumentation.ts`) — reinicie-o após mudar `mocks/`.
+
 ## Docker Networking
 
 This project runs entirely in Docker containers. When configuring connections between services (database, cache, queue, etc.), **always use the Docker Compose service name** as the host — never `localhost` or `127.0.0.1`.

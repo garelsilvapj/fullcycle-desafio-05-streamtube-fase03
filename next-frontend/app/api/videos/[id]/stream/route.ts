@@ -1,4 +1,4 @@
-import { unauthorized, upstreamError, withAuth } from "@/lib/api/authorized";
+import { upstreamError, withOptionalAuth } from "@/lib/api/authorized";
 import { upstream } from "@/lib/api/upstream";
 
 type Params = { params: Promise<{ id: string }> };
@@ -14,14 +14,13 @@ export async function GET(request: Request, { params }: Params) {
   const { id } = await params;
   const range = request.headers.get("range");
 
-  const result = await withAuth((auth) =>
+  const result = await withOptionalAuth((auth) =>
     upstream.GET("/videos/{id}/stream", {
       params: { path: { id } },
       headers: range ? { ...auth, Range: range } : auth,
       parseAs: "stream",
     }),
   );
-  if (!result) return unauthorized();
 
   const { data, error, response } = result;
   if (!response.ok) return upstreamError(error, response);

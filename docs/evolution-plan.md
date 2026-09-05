@@ -287,3 +287,5 @@ Reutilizar: `DomainException`/filtros (`src/common`), `@CurrentUser`/`@Public`, 
 - 2026-09-04 — Fase 04 implementada (backend + frontend) sem inventário do Figma (MCP indisponível):
   decisões em `docs/decisions/technical-decisions-phase-04-management.md`, plano/progresso em
   `docs/phases/phase-04-management/`. Próximo: Fase 05 (página de visualização pública).
+- 2026-09-05 — Fase 05 implementada (`/watch/[slug]`, stream/download públicos, views, sugestões):
+  `docs/decisions/technical-decisions-phase-05-watch.md`, `docs/phases/phase-05-watch/`. Próximo: Fase 06.
