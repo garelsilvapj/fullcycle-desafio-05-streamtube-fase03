@@ -439,6 +439,172 @@
         ]
       }
     },
+    "/channels/me": {
+      "get": {
+        "operationId": "ChannelsController_me",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChannelResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Canal não encontrado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Meu canal",
+        "tags": [
+          "channels"
+        ]
+      },
+      "patch": {
+        "description": "Nome, nickname (único) e descrição do canal do usuário.",
+        "operationId": "ChannelsController_updateMe",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateChannelDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChannelResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Canal não encontrado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Nickname já em uso",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Editar meu canal",
+        "tags": [
+          "channels"
+        ]
+      }
+    },
+    "/channels/{nickname}": {
+      "get": {
+        "description": "Dados públicos do canal e a quantidade de vídeos publicados.",
+        "operationId": "ChannelsController_byNickname",
+        "parameters": [
+          {
+            "name": "nickname",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "example": "alice",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChannelResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Canal não encontrado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Página pública do canal",
+        "tags": [
+          "channels"
+        ]
+      }
+    },
     "/videos": {
       "post": {
         "description": "Cria o vídeo como rascunho (status uploading) no canal do usuário e devolve uma URL pré-assinada (single) ou um plano multipart (arquivos grandes, até 10GB). O arquivo é enviado direto ao storage; depois chame confirm (single) ou multipart/complete.",
@@ -507,19 +673,65 @@
         ]
       },
       "get": {
-        "description": "Vídeos do canal do usuário autenticado, mais recentes primeiro.",
+        "description": "Vídeos do canal do usuário autenticado, paginados, mais recentes primeiro. Filtros opcionais por status de processamento e publicação.",
         "operationId": "VideosController_listMine",
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 50,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/VideoStatus"
+            }
+          },
+          {
+            "name": "published",
+            "required": false,
+            "in": "query",
+            "description": "true = só publicados; false = só rascunhos",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/VideoResponseDto"
-                  }
+                  "$ref": "#/components/schemas/PaginatedVideosResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
                 }
               }
             }
@@ -550,7 +762,7 @@
             "access-token": []
           }
         ],
-        "summary": "Listar meus vídeos",
+        "summary": "Listar meus vídeos (painel)",
         "tags": [
           "videos"
         ]
@@ -917,6 +1129,93 @@
           "videos"
         ]
       },
+      "patch": {
+        "description": "Título, descrição, categoria e visibilidade. `null` limpa descrição/categoria.",
+        "operationId": "VideosController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "ID do vídeo",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateVideoDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VideoResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Vídeo de outro canal",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Vídeo ou categoria não encontrado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Editar vídeo",
+        "tags": [
+          "videos"
+        ]
+      },
       "get": {
         "description": "Metadados e status de um vídeo do canal do usuário.",
         "operationId": "VideosController_get",
@@ -995,10 +1294,10 @@
         ]
       }
     },
-    "/videos/{id}/thumbnail": {
-      "get": {
-        "description": "Redireciona (302) para a URL pré-assinada da thumbnail gerada pelo worker.",
-        "operationId": "VideosController_thumbnail",
+    "/videos/{id}/publish": {
+      "post": {
+        "description": "Só vídeos processados (ready). Idempotente: mantém a data da primeira publicação.",
+        "operationId": "VideosController_publish",
         "parameters": [
           {
             "name": "id",
@@ -1012,8 +1311,15 @@
           }
         ],
         "responses": {
-          "302": {
-            "description": "Redirect para a thumbnail"
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VideoResponseDto"
+                }
+              }
+            }
           },
           "401": {
             "description": "Unauthorized",
@@ -1046,6 +1352,279 @@
             }
           },
           "409": {
+            "description": "Vídeo ainda não processado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Publicar vídeo",
+        "tags": [
+          "videos"
+        ]
+      }
+    },
+    "/videos/{id}/unpublish": {
+      "post": {
+        "operationId": "VideosController_unpublish",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "ID do vídeo",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VideoResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Vídeo de outro canal",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Vídeo não encontrado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Despublicar vídeo (volta a rascunho)",
+        "tags": [
+          "videos"
+        ]
+      }
+    },
+    "/videos/{id}/thumbnail": {
+      "post": {
+        "description": "Devolve uma URL pré-assinada para o PUT da imagem (JPEG/PNG/WebP, até 5MB). Depois chame thumbnail/confirm.",
+        "operationId": "VideosController_createThumbnailUpload",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "ID do vídeo",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateThumbnailUploadDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ThumbnailUploadPlanDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Vídeo de outro canal",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Vídeo não encontrado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Iniciar upload de thumbnail própria",
+        "tags": [
+          "videos"
+        ]
+      },
+      "delete": {
+        "operationId": "VideosController_removeThumbnail",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "ID do vídeo",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VideoResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Vídeo de outro canal",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Vídeo não encontrado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Remover thumbnail própria (volta à gerada pelo worker)",
+        "tags": [
+          "videos"
+        ]
+      },
+      "get": {
+        "description": "Redireciona (302) para a URL pré-assinada da thumbnail (própria ou gerada). Pública para vídeos publicados; o dono vê também os rascunhos (Bearer opcional).",
+        "operationId": "VideosController_thumbnail",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "ID do vídeo",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "302": {
+            "description": "Redirect para a thumbnail"
+          },
+          "404": {
+            "description": "Vídeo não encontrado ou não publicado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
             "description": "Thumbnail ainda não gerada",
             "content": {
               "application/json": {
@@ -1062,6 +1641,85 @@
           }
         ],
         "summary": "Thumbnail do vídeo",
+        "tags": [
+          "videos"
+        ]
+      }
+    },
+    "/videos/{id}/thumbnail/confirm": {
+      "post": {
+        "description": "Valida a imagem enviada (existe, ≤ 5MB) e passa a usá-la no lugar da gerada.",
+        "operationId": "VideosController_confirmThumbnail",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "ID do vídeo",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VideoResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Thumbnail inválida",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Vídeo de outro canal",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Vídeo não encontrado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Confirmar thumbnail própria",
         "tags": [
           "videos"
         ]
@@ -1223,6 +1881,96 @@
           "videos"
         ]
       }
+    },
+    "/channels/{nickname}/videos": {
+      "get": {
+        "description": "Só vídeos públicos, publicados e processados, mais recentes primeiro.",
+        "operationId": "ChannelVideosController_list",
+        "parameters": [
+          {
+            "name": "nickname",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "example": "alice",
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 50,
+              "default": 20,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedVideosResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Canal não encontrado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Vídeos públicos de um canal",
+        "tags": [
+          "channels"
+        ]
+      }
+    },
+    "/categories": {
+      "get": {
+        "description": "Categorias fixas da plataforma, em ordem alfabética.",
+        "operationId": "CategoriesController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CategoryResponseDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Listar categorias",
+        "tags": [
+          "categories"
+        ]
+      }
     }
   },
   "info": {
@@ -1265,6 +2013,63 @@
       "ResetPasswordDto": {
         "type": "object",
         "properties": {}
+      },
+      "ChannelResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string",
+            "example": "Alice"
+          },
+          "nickname": {
+            "type": "string",
+            "example": "alice"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "videosCount": {
+            "type": "number",
+            "description": "Vídeos públicos publicados",
+            "example": 3
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "nickname",
+          "description",
+          "videosCount",
+          "createdAt"
+        ]
+      },
+      "UpdateChannelDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 50
+          },
+          "nickname": {
+            "type": "string",
+            "description": "Minúsculas, dígitos e _ (3–50). \"me\" é reservado.",
+            "example": "alice_videos"
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 1000,
+            "nullable": true
+          }
+        }
       },
       "SingleUploadPlanDto": {
         "type": "object",
@@ -1367,6 +2172,57 @@
           "failed"
         ]
       },
+      "VideoVisibility": {
+        "type": "string",
+        "enum": [
+          "public",
+          "unlisted"
+        ]
+      },
+      "CategoryResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string",
+            "example": "Tecnologia"
+          },
+          "slug": {
+            "type": "string",
+            "example": "tecnologia"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "slug"
+        ]
+      },
+      "VideoChannelSummaryDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "nickname": {
+            "type": "string",
+            "example": "alice"
+          },
+          "name": {
+            "type": "string",
+            "example": "Alice"
+          }
+        },
+        "required": [
+          "id",
+          "nickname",
+          "name"
+        ]
+      },
       "VideoResponseDto": {
         "type": "object",
         "properties": {
@@ -1393,6 +2249,38 @@
               }
             ]
           },
+          "visibility": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/VideoVisibility"
+              }
+            ]
+          },
+          "publishedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "isPublished": {
+            "type": "boolean",
+            "description": "true quando publicado (published_at preenchido)"
+          },
+          "category": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CategoryResponseDto"
+              }
+            ]
+          },
+          "channel": {
+            "$ref": "#/components/schemas/VideoChannelSummaryDto"
+          },
+          "viewsCount": {
+            "type": "number",
+            "example": 0
+          },
           "durationSec": {
             "type": "number",
             "nullable": true
@@ -1405,8 +2293,12 @@
           "thumbnailUrl": {
             "type": "string",
             "nullable": true,
-            "description": "Caminho relativo da thumbnail na API (null até o processamento).",
+            "description": "Caminho relativo da thumbnail na API (custom ou gerada; null até existir).",
             "example": "/videos/3f2b.../thumbnail"
+          },
+          "hasCustomThumbnail": {
+            "type": "boolean",
+            "description": "true quando o dono enviou uma thumbnail própria"
           },
           "error": {
             "type": "string",
@@ -1428,10 +2320,15 @@
           "title",
           "description",
           "status",
+          "visibility",
+          "publishedAt",
+          "isPublished",
+          "category",
+          "viewsCount",
           "durationSec",
           "sizeBytes",
           "thumbnailUrl",
-          "error",
+          "hasCustomThumbnail",
           "createdAt",
           "updatedAt"
         ]
@@ -1508,6 +2405,90 @@
         },
         "required": [
           "uploadId"
+        ]
+      },
+      "PaginatedVideosResponseDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VideoResponseDto"
+            }
+          },
+          "page": {
+            "type": "number",
+            "example": 1
+          },
+          "limit": {
+            "type": "number",
+            "example": 20
+          },
+          "total": {
+            "type": "number",
+            "example": 42
+          }
+        },
+        "required": [
+          "items",
+          "page",
+          "limit",
+          "total"
+        ]
+      },
+      "UpdateVideoDto": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 5000,
+            "nullable": true
+          },
+          "categoryId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "visibility": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/VideoVisibility"
+              }
+            ]
+          }
+        }
+      },
+      "CreateThumbnailUploadDto": {
+        "type": "object",
+        "properties": {
+          "contentType": {
+            "type": "string",
+            "enum": [
+              "image/jpeg",
+              "image/png",
+              "image/webp"
+            ],
+            "example": "image/jpeg"
+          }
+        },
+        "required": [
+          "contentType"
+        ]
+      },
+      "ThumbnailUploadPlanDto": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "URL pré-assinada para o PUT da imagem (máx. 5MB)."
+          }
+        },
+        "required": [
+          "url"
         ]
       },
       "ApiErrorEnvelope": {

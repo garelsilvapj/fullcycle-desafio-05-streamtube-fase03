@@ -22,12 +22,17 @@ export class JwtAuthGuard implements CanActivate {
       context.getHandler(),
       context.getClass(),
     ]);
-    if (isPublic) return true;
-
     const request = context
       .switchToHttp()
       .getRequest<{ headers: Record<string, string>; user: unknown }>();
     const authHeader = request.headers?.authorization;
+
+    // Rotas públicas: autenticação opcional (TD-04.5). Um Bearer válido identifica o usuário
+    // (ex.: dono vendo a thumbnail de um rascunho); ausente ou inválido, segue anônimo.
+    if (isPublic) {
+      request.user = await this.tryParseUser(authHeader);
+      return true;
+    }
 
     if (!authHeader || !authHeader.startsWith(BEARER_PREFIX)) {
       throw new UnauthorizedException();
@@ -41,6 +46,19 @@ export class JwtAuthGuard implements CanActivate {
       return true;
     } catch {
       throw new UnauthorizedException();
+    }
+  }
+
+  private async tryParseUser(
+    authHeader: string | undefined,
+  ): Promise<JwtPayload | undefined> {
+    if (!authHeader || !authHeader.startsWith(BEARER_PREFIX)) return undefined;
+    try {
+      return await this.jwtService.verifyAsync<JwtPayload>(
+        authHeader.slice(BEARER_PREFIX.length),
+      );
+    } catch {
+      return undefined;
     }
   }
 }

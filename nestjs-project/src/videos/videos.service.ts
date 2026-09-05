@@ -1,17 +1,28 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { IsNull, Not, Repository } from 'typeorm';
 import { randomUUID } from 'crypto';
 
-import { Video, VideoStatus } from './entities/video.entity';
+import { Video, VideoStatus, VideoVisibility } from './entities/video.entity';
 import { Channel } from '../channels/entities/channel.entity';
 import { CreateVideoDto } from './dto/create-video.dto';
+import { UpdateVideoDto } from './dto/update-video.dto';
+import { ListVideosQueryDto } from './dto/list-videos.query.dto';
+import { isVideoPublished } from './dto/video-response.dto';
+import type {
+  Paginated,
+  PaginationQueryDto,
+} from '../common/dto/pagination.query.dto';
+import { CategoriesService } from '../categories/categories.service';
+import { ChannelNotFoundException as PublicChannelNotFoundException } from '../channels/channel.exceptions';
 import { CompletedPart, StorageService } from '../storage/storage.service';
 import { VideoQueueService } from '../queue/video-queue.service';
 import { isPgUniqueViolationOnColumn } from '../common/database/pg-errors';
 import { generateVideoSlug } from './slug.util';
 import {
   buildVideoKeyPrefix,
+  THUMBNAIL_MAX_SIZE_BYTES,
+  type ThumbnailContentType,
   VIDEO_SLUG_COLUMN,
   VIDEO_SLUG_MAX_RETRIES,
   VIDEO_STORAGE_KEYS,
@@ -22,7 +33,9 @@ import {
   VideoChannelForbiddenException,
   VideoInvalidStateException,
   VideoNotFoundException,
+  VideoNotPublishableException,
   VideoNotReadyException,
+  VideoThumbnailInvalidException,
   VideoUploadNotConfirmedException,
 } from './video.exceptions';
 
@@ -43,6 +56,7 @@ export class VideosService {
     @InjectRepository(Channel) private readonly channels: Repository<Channel>,
     private readonly storage: StorageService,
     private readonly queue: VideoQueueService,
+    private readonly categories: CategoriesService,
   ) {}
 
   /** Resolve o canal do usuário autenticado (relação 1:1 user↔channel). */
@@ -182,17 +196,166 @@ export class VideosService {
   }
 
   async get(id: string): Promise<Video> {
-    const video = await this.repo.findOne({ where: { id } });
+    const video = await this.repo.findOne({
+      where: { id },
+      relations: ['category'],
+    });
     if (!video) throw new VideoNotFoundException();
     return video;
   }
 
-  async listMine(userId: string): Promise<Video[]> {
+  /** Painel do dono: paginado, com filtros de status e publicação (TD-04.6). */
+  async listMine(
+    userId: string,
+    query: ListVideosQueryDto,
+  ): Promise<Paginated<Video>> {
     const channel = await this.myChannel(userId);
-    return this.repo.find({
-      where: { channel_id: channel.id },
+    const [items, total] = await this.repo.findAndCount({
+      where: {
+        channel_id: channel.id,
+        ...(query.status !== undefined && { status: query.status }),
+        ...(query.published === true && { published_at: Not(IsNull()) }),
+        ...(query.published === false && { published_at: IsNull() }),
+      },
+      relations: ['category'],
       order: { created_at: 'DESC' },
+      skip: (query.page - 1) * query.limit,
+      take: query.limit,
     });
+    return { items, page: query.page, limit: query.limit, total };
+  }
+
+  /** Página pública do canal: só vídeos públicos, publicados e processados (TD-04.3). */
+  async listPublicByChannel(
+    nickname: string,
+    query: PaginationQueryDto,
+  ): Promise<Paginated<Video>> {
+    const channel = await this.channels.findOne({ where: { nickname } });
+    if (!channel) throw new PublicChannelNotFoundException();
+    const [items, total] = await this.repo.findAndCount({
+      where: {
+        channel_id: channel.id,
+        visibility: VideoVisibility.PUBLIC,
+        published_at: Not(IsNull()),
+        status: VideoStatus.READY,
+      },
+      relations: ['category', 'channel'],
+      order: { published_at: 'DESC' },
+      skip: (query.page - 1) * query.limit,
+      take: query.limit,
+    });
+    return { items, page: query.page, limit: query.limit, total };
+  }
+
+  /** Edição de metadados pelo dono (TD-04.2/04.3). */
+  async update(
+    userId: string,
+    id: string,
+    dto: UpdateVideoDto,
+  ): Promise<Video> {
+    const video = await this.getOwned(userId, id);
+    if (dto.title !== undefined) video.title = dto.title;
+    if (dto.description !== undefined) video.description = dto.description;
+    if (dto.visibility !== undefined) video.visibility = dto.visibility;
+    if (dto.categoryId !== undefined) {
+      if (dto.categoryId === null) {
+        video.category_id = null;
+        video.category = null;
+      } else {
+        const category = await this.categories.getById(dto.categoryId);
+        video.category_id = category.id;
+        video.category = category;
+      }
+    }
+    await this.repo.save(video);
+    return this.getOwned(userId, id);
+  }
+
+  /** Publica um vídeo já processado; idempotente (mantém a data original). */
+  async publish(userId: string, id: string): Promise<Video> {
+    const video = await this.getOwned(userId, id);
+    if (video.status !== VideoStatus.READY) {
+      throw new VideoNotPublishableException();
+    }
+    if (!video.published_at) {
+      video.published_at = new Date();
+      await this.repo.save(video);
+    }
+    return video;
+  }
+
+  /** Volta o vídeo a rascunho. */
+  async unpublish(userId: string, id: string): Promise<Video> {
+    const video = await this.getOwned(userId, id);
+    if (video.published_at) {
+      video.published_at = null;
+      await this.repo.save(video);
+    }
+    return video;
+  }
+
+  /** URL pré-assinada para o dono enviar uma thumbnail própria (TD-04.4). */
+  async createThumbnailUpload(
+    userId: string,
+    id: string,
+    contentType: ThumbnailContentType,
+  ): Promise<{ url: string }> {
+    const video = await this.getOwned(userId, id);
+    const key = this.customThumbnailKey(video);
+    return { url: await this.storage.createPresignedUpload(key, contentType) };
+  }
+
+  /** Confirma a thumbnail enviada: existe e respeita o tamanho máximo. */
+  async confirmThumbnail(userId: string, id: string): Promise<Video> {
+    const video = await this.getOwned(userId, id);
+    const key = this.customThumbnailKey(video);
+    const head = await this.storage.head(key);
+    if (!head)
+      throw new VideoThumbnailInvalidException(
+        'imagem não encontrada no storage',
+      );
+    if (head.size > THUMBNAIL_MAX_SIZE_BYTES) {
+      await this.storage.deleteObjects([key]);
+      throw new VideoThumbnailInvalidException('imagem maior que 5MB');
+    }
+    video.custom_thumbnail_key = key;
+    await this.repo.save(video);
+    return video;
+  }
+
+  /** Remove a thumbnail própria; volta a usar a gerada pelo worker. */
+  async removeCustomThumbnail(userId: string, id: string): Promise<Video> {
+    const video = await this.getOwned(userId, id);
+    if (video.custom_thumbnail_key) {
+      await this.storage.deleteObjects([video.custom_thumbnail_key]);
+      video.custom_thumbnail_key = null;
+      await this.repo.save(video);
+    }
+    return video;
+  }
+
+  private customThumbnailKey(video: Video): string {
+    return `${buildVideoKeyPrefix(video.channel_id, video.id)}/${VIDEO_STORAGE_KEYS.CUSTOM_THUMBNAIL}`;
+  }
+
+  /**
+   * Vídeo visível para quem consulta: o dono vê tudo; qualquer outro (inclusive anônimo) só
+   * vê vídeos publicados — e não descobre a existência dos demais (404).
+   */
+  async getViewable(userId: string | null, id: string): Promise<Video> {
+    const video = await this.repo.findOne({
+      where: { id },
+      relations: ['category', 'channel'],
+    });
+    if (!video) throw new VideoNotFoundException();
+    if (userId) {
+      const channel = await this.channels.findOne({
+        where: { user_id: userId },
+      });
+      if (channel && channel.id === video.channel_id) return video;
+    }
+    if (!isVideoPublished(video)) throw new VideoNotFoundException();
+    return video;
   }
 
   /** Recupera o vídeo garantindo que pertence ao canal do usuário. */
@@ -220,10 +383,11 @@ export class VideosService {
     return { video, key: video.processed_key };
   }
 
-  /** Chave da thumbnail gerada pelo worker (dono do canal). */
-  async thumbnailKey(userId: string, id: string): Promise<string> {
-    const video = await this.getOwned(userId, id);
-    if (!video.thumbnail_key) throw new VideoNotReadyException();
-    return video.thumbnail_key;
+  /** Chave da thumbnail servida (custom ?? gerada) para quem pode ver o vídeo (TD-04.4/04.5). */
+  async thumbnailKey(userId: string | null, id: string): Promise<string> {
+    const video = await this.getViewable(userId, id);
+    const key = video.custom_thumbnail_key ?? video.thumbnail_key;
+    if (!key) throw new VideoNotReadyException();
+    return key;
   }
 }

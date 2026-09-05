@@ -24,7 +24,21 @@ export const VIDEO_STORAGE_KEYS = {
   ORIGINAL: 'original',
   PROCESSED: 'processed.mp4',
   THUMBNAIL: 'thumb.jpg',
+  /** Thumbnail enviada pelo dono (o content-type fica no objeto). */
+  CUSTOM_THUMBNAIL: 'thumb-custom',
 } as const;
+
+export const THUMBNAIL_CONTENT_TYPES = [
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+] as const;
+export type ThumbnailContentType = (typeof THUMBNAIL_CONTENT_TYPES)[number];
+export const THUMBNAIL_MAX_SIZE_BYTES = 5 * MiB;
+
+/** Nicknames que colidem com rotas (`/channels/me`). */
+export const RESERVED_NICKNAMES = ['me'] as const;
+export const NICKNAME_PATTERN = /^[a-z0-9_]{3,50}$/;
 
 /** Prefixo comum de todos os objetos de um vídeo no storage. */
 export function buildVideoKeyPrefix(

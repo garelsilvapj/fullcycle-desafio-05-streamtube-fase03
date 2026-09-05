@@ -8,7 +8,9 @@ import {
   HttpStatus,
   Param,
   ParseUUIDPipe,
+  Patch,
   Post,
+  Query,
   Res,
 } from '@nestjs/common';
 import {
@@ -26,7 +28,17 @@ import { SkipThrottle } from '@nestjs/throttler';
 import { VideosService } from './videos.service';
 import { CreateVideoDto } from './dto/create-video.dto';
 import { AbortMultipartDto, CompleteMultipartDto } from './dto/multipart.dto';
-import { toVideoResponse, VideoResponseDto } from './dto/video-response.dto';
+import { UpdateVideoDto } from './dto/update-video.dto';
+import { ListVideosQueryDto } from './dto/list-videos.query.dto';
+import {
+  CreateThumbnailUploadDto,
+  ThumbnailUploadPlanDto,
+} from './dto/thumbnail.dto';
+import {
+  PaginatedVideosResponseDto,
+  toVideoResponse,
+  VideoResponseDto,
+} from './dto/video-response.dto';
 import {
   MultipartUploadPlanDto,
   RegisterVideoResponseDto,
@@ -34,6 +46,7 @@ import {
 } from './dto/register-video-response.dto';
 import { StorageService } from '../storage/storage.service';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { Public } from '../auth/decorators/public.decorator';
 import type { JwtPayload } from '../auth/auth.types';
 import { ApiErrorEnvelope } from '../common/openapi/api-error-envelope.dto';
 import { VideoInvalidRangeException } from './video.exceptions';
@@ -238,20 +251,220 @@ export class VideosController {
 
   @Get()
   @ApiOperation({
-    summary: 'Listar meus vídeos',
+    summary: 'Listar meus vídeos (painel)',
     description:
-      'Vídeos do canal do usuário autenticado, mais recentes primeiro.',
+      'Vídeos do canal do usuário autenticado, paginados, mais recentes primeiro. Filtros opcionais por status de processamento e publicação.',
   })
-  @ApiResponse({ status: 200, type: [VideoResponseDto] })
+  @ApiResponse({ status: 200, type: PaginatedVideosResponseDto })
+  @ApiResponse({
+    status: 400,
+    description: 'Validation failed',
+    schema: errorRef,
+  })
   @ApiResponse({ status: 401, description: 'Unauthorized', schema: errorRef })
   @ApiResponse({
     status: 404,
     description: 'Canal do usuário não encontrado',
     schema: errorRef,
   })
-  async listMine(@CurrentUser() user: JwtPayload): Promise<VideoResponseDto[]> {
-    const videos = await this.videos.listMine(user.sub);
-    return videos.map((v) => toVideoResponse(v, { owner: true }));
+  async listMine(
+    @CurrentUser() user: JwtPayload,
+    @Query() query: ListVideosQueryDto,
+  ): Promise<PaginatedVideosResponseDto> {
+    const page = await this.videos.listMine(user.sub, query);
+    return {
+      ...page,
+      items: page.items.map((v) => toVideoResponse(v, { owner: true })),
+    };
+  }
+
+  @Patch(':id')
+  @ApiOperation({
+    summary: 'Editar vídeo',
+    description:
+      'Título, descrição, categoria e visibilidade. `null` limpa descrição/categoria.',
+  })
+  @ApiParam(ID_PARAM)
+  @ApiResponse({ status: 200, type: VideoResponseDto })
+  @ApiResponse({
+    status: 400,
+    description: 'Validation failed',
+    schema: errorRef,
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized', schema: errorRef })
+  @ApiResponse({
+    status: 403,
+    description: 'Vídeo de outro canal',
+    schema: errorRef,
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Vídeo ou categoria não encontrado',
+    schema: errorRef,
+  })
+  async update(
+    @CurrentUser() user: JwtPayload,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: UpdateVideoDto,
+  ): Promise<VideoResponseDto> {
+    const video = await this.videos.update(user.sub, id, dto);
+    return toVideoResponse(video, { owner: true });
+  }
+
+  @Post(':id/publish')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Publicar vídeo',
+    description:
+      'Só vídeos processados (ready). Idempotente: mantém a data da primeira publicação.',
+  })
+  @ApiParam(ID_PARAM)
+  @ApiResponse({ status: 200, type: VideoResponseDto })
+  @ApiResponse({ status: 401, description: 'Unauthorized', schema: errorRef })
+  @ApiResponse({
+    status: 403,
+    description: 'Vídeo de outro canal',
+    schema: errorRef,
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Vídeo não encontrado',
+    schema: errorRef,
+  })
+  @ApiResponse({
+    status: 409,
+    description: 'Vídeo ainda não processado',
+    schema: errorRef,
+  })
+  async publish(
+    @CurrentUser() user: JwtPayload,
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<VideoResponseDto> {
+    return toVideoResponse(await this.videos.publish(user.sub, id), {
+      owner: true,
+    });
+  }
+
+  @Post(':id/unpublish')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Despublicar vídeo (volta a rascunho)' })
+  @ApiParam(ID_PARAM)
+  @ApiResponse({ status: 200, type: VideoResponseDto })
+  @ApiResponse({ status: 401, description: 'Unauthorized', schema: errorRef })
+  @ApiResponse({
+    status: 403,
+    description: 'Vídeo de outro canal',
+    schema: errorRef,
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Vídeo não encontrado',
+    schema: errorRef,
+  })
+  async unpublish(
+    @CurrentUser() user: JwtPayload,
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<VideoResponseDto> {
+    return toVideoResponse(await this.videos.unpublish(user.sub, id), {
+      owner: true,
+    });
+  }
+
+  @Post(':id/thumbnail')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Iniciar upload de thumbnail própria',
+    description:
+      'Devolve uma URL pré-assinada para o PUT da imagem (JPEG/PNG/WebP, até 5MB). Depois chame thumbnail/confirm.',
+  })
+  @ApiParam(ID_PARAM)
+  @ApiResponse({ status: 200, type: ThumbnailUploadPlanDto })
+  @ApiResponse({
+    status: 400,
+    description: 'Validation failed',
+    schema: errorRef,
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized', schema: errorRef })
+  @ApiResponse({
+    status: 403,
+    description: 'Vídeo de outro canal',
+    schema: errorRef,
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Vídeo não encontrado',
+    schema: errorRef,
+  })
+  async createThumbnailUpload(
+    @CurrentUser() user: JwtPayload,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: CreateThumbnailUploadDto,
+  ): Promise<ThumbnailUploadPlanDto> {
+    return this.videos.createThumbnailUpload(user.sub, id, dto.contentType);
+  }
+
+  @Post(':id/thumbnail/confirm')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Confirmar thumbnail própria',
+    description:
+      'Valida a imagem enviada (existe, ≤ 5MB) e passa a usá-la no lugar da gerada.',
+  })
+  @ApiParam(ID_PARAM)
+  @ApiResponse({ status: 200, type: VideoResponseDto })
+  @ApiResponse({
+    status: 400,
+    description: 'Thumbnail inválida',
+    schema: errorRef,
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized', schema: errorRef })
+  @ApiResponse({
+    status: 403,
+    description: 'Vídeo de outro canal',
+    schema: errorRef,
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Vídeo não encontrado',
+    schema: errorRef,
+  })
+  async confirmThumbnail(
+    @CurrentUser() user: JwtPayload,
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<VideoResponseDto> {
+    return toVideoResponse(await this.videos.confirmThumbnail(user.sub, id), {
+      owner: true,
+    });
+  }
+
+  @Delete(':id/thumbnail')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Remover thumbnail própria (volta à gerada pelo worker)',
+  })
+  @ApiParam(ID_PARAM)
+  @ApiResponse({ status: 200, type: VideoResponseDto })
+  @ApiResponse({ status: 401, description: 'Unauthorized', schema: errorRef })
+  @ApiResponse({
+    status: 403,
+    description: 'Vídeo de outro canal',
+    schema: errorRef,
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Vídeo não encontrado',
+    schema: errorRef,
+  })
+  async removeThumbnail(
+    @CurrentUser() user: JwtPayload,
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<VideoResponseDto> {
+    return toVideoResponse(
+      await this.videos.removeCustomThumbnail(user.sub, id),
+      {
+        owner: true,
+      },
+    );
   }
 
   @Get(':id')
@@ -281,23 +494,18 @@ export class VideosController {
     return toVideoResponse(video, { owner: true });
   }
 
+  @Public()
   @Get(':id/thumbnail')
   @ApiOperation({
     summary: 'Thumbnail do vídeo',
     description:
-      'Redireciona (302) para a URL pré-assinada da thumbnail gerada pelo worker.',
+      'Redireciona (302) para a URL pré-assinada da thumbnail (própria ou gerada). Pública para vídeos publicados; o dono vê também os rascunhos (Bearer opcional).',
   })
   @ApiParam(ID_PARAM)
   @ApiResponse({ status: 302, description: 'Redirect para a thumbnail' })
-  @ApiResponse({ status: 401, description: 'Unauthorized', schema: errorRef })
-  @ApiResponse({
-    status: 403,
-    description: 'Vídeo de outro canal',
-    schema: errorRef,
-  })
   @ApiResponse({
     status: 404,
-    description: 'Vídeo não encontrado',
+    description: 'Vídeo não encontrado ou não publicado',
     schema: errorRef,
   })
   @ApiResponse({
@@ -306,11 +514,11 @@ export class VideosController {
     schema: errorRef,
   })
   async thumbnail(
-    @CurrentUser() user: JwtPayload,
+    @CurrentUser() user: JwtPayload | undefined,
     @Param('id', ParseUUIDPipe) id: string,
     @Res() res: Response,
   ): Promise<void> {
-    const key = await this.videos.thumbnailKey(user.sub, id);
+    const key = await this.videos.thumbnailKey(user?.sub ?? null, id);
     res.redirect(
       HttpStatus.FOUND,
       await this.storage.createPresignedDownload(key),

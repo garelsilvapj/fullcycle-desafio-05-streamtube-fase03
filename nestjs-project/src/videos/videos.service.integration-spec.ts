@@ -9,6 +9,8 @@ import {
 } from '../test/create-test-data-source';
 import type { StorageService } from '../storage/storage.service';
 import type { VideoQueueService } from '../queue/video-queue.service';
+import { CategoriesService } from '../categories/categories.service';
+import { Category } from '../categories/entities/category.entity';
 import { Video, VideoStatus } from './entities/video.entity';
 import { VideosService } from './videos.service';
 import { generateVideoSlug } from './slug.util';
@@ -25,7 +27,14 @@ jest.mock('./slug.util', () => {
   return { ...actual, generateVideoSlug: jest.fn(actual.generateVideoSlug) };
 });
 
-const ALL_ENTITIES = [User, Channel, RefreshToken, VerificationToken, Video];
+const ALL_ENTITIES = [
+  User,
+  Channel,
+  RefreshToken,
+  VerificationToken,
+  Video,
+  Category,
+];
 const MiB = 1024 * 1024;
 
 /** Storage em memória: só guarda quais chaves "existem" e seus tamanhos. */
@@ -102,6 +111,7 @@ describe('VideosService (integration)', () => {
       channels,
       storage as unknown as StorageService,
       queue as unknown as VideoQueueService,
+      new CategoriesService(dataSource.getRepository(Category)),
     );
   });
 
@@ -267,9 +277,14 @@ describe('VideosService (integration)', () => {
       const v2 = await service.register(a.user.id, { title: 'a2' });
       await service.register(b.user.id, { title: 'b1' });
 
-      const mine = await service.listMine(a.user.id);
-      expect(mine.map((v) => v.id)).toEqual([v2.video.id, v1.video.id]);
-      expect(await service.listMine(b.user.id)).toHaveLength(1);
+      const query = { page: 1, limit: 20 };
+      const mine = await service.listMine(a.user.id, query);
+      expect(mine.items.map((v) => v.id)).toEqual([v2.video.id, v1.video.id]);
+      expect(mine.total).toBe(2);
+      expect((await service.listMine(b.user.id, query)).items).toHaveLength(1);
+      const paged = await service.listMine(a.user.id, { page: 2, limit: 1 });
+      expect(paged.items.map((v) => v.id)).toEqual([v1.video.id]);
+      expect(paged.total).toBe(2);
     });
 
     it('getOwned rejects another channel video and unknown ids', async () => {

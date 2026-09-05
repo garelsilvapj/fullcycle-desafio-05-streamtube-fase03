@@ -51,6 +51,23 @@ Ciclo completo de upload e processamento de vídeos. Ver
 
 Fluxo: registrar → `PUT` no `uploadUrl` → confirmar → worker processa → `GET /stream`.
 
+## Gerenciamento de Vídeos e Canal (Fase 04)
+
+Ver `docs/decisions/technical-decisions-phase-04-management.md` e `docs/phases/phase-04-management/`.
+
+- **Categorias**: `src/categories/` (tabela fixa semeada pela migration `CreateCategories`; `GET /categories` público).
+- **Vídeo**: `category_id`, `visibility` (`public|unlisted`), `published_at` (null = rascunho; publicar exige
+  `ready`), `custom_thumbnail_key` (prevalece sobre a gerada), `views_count`. Endpoints: `PATCH /videos/:id`,
+  `POST /videos/:id/{publish,unpublish}`, `POST /videos/:id/thumbnail` (+ `/confirm`, `DELETE`),
+  `GET /videos?page&limit&status&published` (painel paginado).
+- **Canal**: `src/channels/channels.controller.ts` — `GET/PATCH /channels/me` (nickname único, `me` reservado),
+  `GET /channels/:nickname` público; listagem pública em `src/videos/channel-videos.controller.ts`
+  (`GET /channels/:nickname/videos`, só público + publicado + ready).
+- **Auth opcional**: em rotas `@Public()` o `JwtAuthGuard` tenta ler o Bearer sem exigir (`request.user` fica
+  `undefined` para anônimos). `GET /videos/:id/thumbnail` usa isso (público para publicados, dono vê rascunhos).
+- **Frontend**: `/studio` (painel), `/studio/videos/[id]`, `/studio/channel`, `/c/[nickname]` (público);
+  BFF em `app/api/{categories,channels,videos}/**` com `withAuth`/`withOptionalAuth` (`lib/api/authorized.ts`).
+
 ## Docker Networking
 
 This project runs entirely in Docker containers. When configuring connections between services (database, cache, queue, etc.), **always use the Docker Compose service name** as the host — never `localhost` or `127.0.0.1`.

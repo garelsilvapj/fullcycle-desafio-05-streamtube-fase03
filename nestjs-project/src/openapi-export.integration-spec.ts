@@ -123,9 +123,16 @@ describe('exportSpec (integration)', () => {
       ['/videos/{id}/confirm', 'post'],
       ['/videos/{id}/multipart/complete', 'post'],
       ['/videos/{id}/multipart/abort', 'post'],
-      ['/videos/{id}/thumbnail', 'get'],
+      ['/videos/{id}/thumbnail', 'post'],
+      ['/videos/{id}/thumbnail', 'delete'],
+      ['/videos/{id}/thumbnail/confirm', 'post'],
+      ['/videos/{id}/publish', 'post'],
+      ['/videos/{id}/unpublish', 'post'],
+      ['/videos/{id}', 'patch'],
       ['/videos/{id}/download', 'get'],
       ['/videos/{id}/stream', 'get'],
+      ['/channels/me', 'get'],
+      ['/channels/me', 'patch'],
     ];
 
     for (const [path, method] of expected) {
@@ -134,6 +141,23 @@ describe('exportSpec (integration)', () => {
       expect((operation.summary as string).length).toBeGreaterThan(0);
       const security = operation.security as Array<Record<string, unknown>>;
       expect(security.some((req) => 'access-token' in req)).toBe(true);
+    }
+  });
+
+  it('documents the public endpoints without a security requirement', () => {
+    const paths = document.paths as Record<
+      string,
+      Record<string, Record<string, unknown>>
+    >;
+    for (const [path, method] of [
+      ['/categories', 'get'],
+      ['/channels/{nickname}', 'get'],
+      ['/channels/{nickname}/videos', 'get'],
+      ['/videos/{id}/thumbnail', 'get'],
+    ]) {
+      const operation = paths[path]?.[method];
+      expect(operation).toBeDefined();
+      expect((operation.summary as string).length).toBeGreaterThan(0);
     }
   });
 
