@@ -34,7 +34,7 @@ worker), CI e ausência da fatia frontend. O fechamento segue as etapas do plano
 | 3 | Testes de integração e e2e (vídeos, storage, fila, migrations) | ✅ feito (2026-09-04) — 252 unit+integração e 69 e2e verdes (`--runInBand`) |
 | 4 | Validação funcional local (`scripts/smoke-videos.sh` + `manual-validation.md`) | ✅ feito (2026-09-04) — smoke 58/59 (falha só no script) e 46/46; achado: rate limit global bloqueava polling → `@SkipThrottle()` |
 | 5 | CI completa (unit, integração/e2e com serviços, worker, frontend, openapi-freshness) | ✅ feito (2026-09-04) — `.github/workflows/ci.yml` com jobs api/worker/frontend; frescor do `types.gen.ts` entra com a Etapa 6 |
-| 6 | Fatia `phase-03-videos-frontend` (upload, meus vídeos, player) | ⏳ |
+| 6 | Fatia `phase-03-videos-frontend` (upload, meus vídeos, player) | ✅ feito (2026-09-04) — 115 Vitest + 19 Playwright; docs em `docs/phases/phase-03-videos-frontend/` |
 | 7 | Fechamento (docs, suíte completa verde, tag) | ⏳ |
 
 Para rodar de ponta a ponta hoje: `cd nestjs-project && cp .env.example .env && docker compose up -d --build`,

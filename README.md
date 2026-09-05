@@ -151,7 +151,7 @@ Sufixos: `*.test.ts(x)` (unitário), `*.integration.test.ts(x)` (Route Handlers 
 
 ## ✅ Funcionalidades implementadas
 
-**Fase 01 — Configuração base** e **Fase 02 — Autenticação** estão concluídas (backend + frontend).
+**Fase 01 — Configuração base**, **Fase 02 — Autenticação** e **Fase 03 — Vídeos** estão concluídas (backend + frontend).
 
 ### Autenticação (Fase 02)
 
@@ -178,9 +178,9 @@ Telas e Route Handlers BFF (`next-frontend`):
 
 Segurança: senhas com **Argon2**, **JWT** com `JwtAuthGuard` global (opt-out via `@Public()`), **rotação de refresh token** com detecção de reuso, **rate limiting** (`ThrottlerGuard`) nos endpoints de auth, e sessão no navegador via **iron-session** (cookies HTTP-only).
 
-### Vídeos (Fase 03 — em andamento)
+### Vídeos (Fase 03)
 
-Backend e worker implementados; o fechamento da fase (hardening, testes de integração/e2e, validação local, CI e a fatia frontend) está descrito em [`docs/evolution-plan.md`](docs/evolution-plan.md).
+Ciclo completo de upload e processamento, com backend, worker, frontend, testes em todas as camadas e validação funcional local (`scripts/smoke-videos.sh`). Histórico do fechamento em [`docs/evolution-plan.md`](docs/evolution-plan.md).
 
 Estados do vídeo: `uploading → uploaded → processing → ready | failed`.
 
@@ -196,6 +196,12 @@ Estados do vídeo: `uploading → uploaded → processing → ready | failed`.
 | `GET /videos/:id/download` | Redireciona (302) para URL pré-assinada de download (só `ready`) |
 
 Fluxo: registrar → `PUT` do arquivo na URL pré-assinada → confirmar → worker processa (thumbnail + MP4 H.264/AAC, duração) → `GET /stream`.
+
+Telas e BFF (`next-frontend`, fatia `phase-03-videos-frontend`):
+
+- `/upload` — formulário com progresso (single ou multipart direto ao storage), cancelamento e acompanhamento até `ready`.
+- `/videos` — meus vídeos com status, thumbnail e auto-refresh; `/videos/[id]` — player HTML5 via `GET /api/videos/[id]/stream` (Range → 206), download, exclusão.
+- `app/api/videos/**` — Route Handlers com sessão + refresh transparente; `docs/decisions/technical-decisions-phase-03-videos-frontend.md`.
 
 ## 🛠️ Estrutura do Projeto
 
@@ -248,7 +254,7 @@ green-field-ia-project/
 |------|-----------|--------|
 | **01** | Configuração Base do Projeto | ✅ Concluída |
 | **02** | Cadastro, Login e Gerenciamento de Conta | ✅ Concluída |
-| **03** | Upload e Processamento de Vídeos | 🔧 Em andamento — backend e worker prontos; fechamento (testes, CI, frontend) em [`docs/evolution-plan.md`](docs/evolution-plan.md) |
+| **03** | Upload e Processamento de Vídeos | ✅ Concluída (backend, worker, frontend, testes, CI) — histórico em [`docs/evolution-plan.md`](docs/evolution-plan.md) |
 | **04** | Gerenciamento de Vídeos e Canal | ⏳ Planejada |
 | **05** | Página de Visualização do Vídeo | ⏳ Planejada |
 | **06** | Interações Sociais (Likes, Comentários, Inscrições) | ⏳ Planejada |

@@ -55,3 +55,32 @@ export type RefreshTokenPair =
 // Shared error envelope (all auth 4xx responses)
 export type ApiErrorEnvelope =
   paths["/auth/register"]["post"]["responses"][400]["content"]["application/json"];
+
+// ─── Videos (Fase 03) ──────────────────────────────────────────────────────────
+
+// Request bodies
+export type RegisterVideoDto =
+  paths["/videos"]["post"]["requestBody"]["content"]["application/json"];
+
+export type CompleteMultipartDto =
+  paths["/videos/{id}/multipart/complete"]["post"]["requestBody"]["content"]["application/json"];
+
+export type AbortMultipartDto =
+  paths["/videos/{id}/multipart/abort"]["post"]["requestBody"]["content"]["application/json"];
+
+// Upstream success response bodies (pass-through)
+export type Video =
+  paths["/videos/{id}"]["get"]["responses"][200]["content"]["application/json"];
+
+export type VideoList =
+  paths["/videos"]["get"]["responses"][200]["content"]["application/json"];
+
+export type RegisterVideoResponse =
+  paths["/videos"]["post"]["responses"][201]["content"]["application/json"];
+
+// Reshape aliases (named-only)
+export type VideoStatus = Video["status"];
+export type UploadPlan = RegisterVideoResponse["upload"];
+export type SingleUploadPlan = Extract<UploadPlan, { type: "single" }>;
+export type MultipartUploadPlan = Extract<UploadPlan, { type: "multipart" }>;
+export type CompletedPart = CompleteMultipartDto["parts"][number];

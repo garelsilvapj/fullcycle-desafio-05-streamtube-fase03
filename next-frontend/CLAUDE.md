@@ -124,7 +124,7 @@ The upstream API publishes an OpenAPI 3.x spec. **Every wire shape in `next-fron
 
 Contract chain: `openapi.json` (committed local copy) → `lib/api/types.gen.ts` (generated, do not edit) → `paths` (typed surface) → consumers (BFF + components + MSW).
 
-CI guard: `.github/workflows/openapi-freshness.yml` blocks merging stale spec/types pairs.
+CI guard: the `frontend` job in `.github/workflows/ci.yml` re-runs `scripts/sync-openapi.sh` + `npm run openapi:types` and fails on drift in `lib/api/types.gen.ts`.
 
 Source of decisions: `docs/decisions/technical-decisions-next-frontend-openapi-typing.md` (TD-01…TD-05).
 
@@ -136,7 +136,7 @@ Source of decisions: `docs/decisions/technical-decisions-next-frontend-openapi-t
 
 The concrete value of `API_URL` depends on Docker Compose topology (e.g., `http://nestjs-api:3000` on a shared Compose network vs `http://host.docker.internal:3000` from a separate stack). The stacks are currently separate — networking integration is deferred to its own infra task; in the meantime, `.env.local` carries whichever value the local environment can reach.
 
-Media streaming will eventually come from Object Storage (S3/MinIO) — TBD.
+Media: the **upload** goes from the browser straight to the object storage (presigned URL returned by `POST /api/videos`; the target is MinIO/S3, not the NestJS API, so the BFF rule holds — see `docs/decisions/technical-decisions-phase-03-videos-frontend.md`). **Streaming** goes through the BFF proxy `GET /api/videos/[id]/stream` (Range → 206); download and thumbnail are 302 redirects to presigned storage URLs.
 
 Refer to the C4 container diagram at `docs/diagrams/software-arch.mermaid` for the full system view.
 

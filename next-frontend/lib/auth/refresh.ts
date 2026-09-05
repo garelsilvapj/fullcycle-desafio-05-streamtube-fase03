@@ -39,7 +39,8 @@ async function tryRefresh(): Promise<boolean> {
   return true;
 }
 
-function refreshOnce(): Promise<boolean> {
+/** Renova a sessão uma única vez por vez (single-flight). Exposto para o helper `withAuth`. */
+export function refreshOnce(): Promise<boolean> {
   if (!refreshPromise) {
     refreshPromise = tryRefresh().finally(() => {
       refreshPromise = null;
