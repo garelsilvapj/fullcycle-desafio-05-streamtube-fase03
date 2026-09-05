@@ -21,6 +21,7 @@ import { ReactionsModule } from './reactions/reactions.module';
 import { CommentsModule } from './comments/comments.module';
 import { SubscriptionsModule } from './subscriptions/subscriptions.module';
 import { SocialModule } from './social/social.module';
+import { DiscoveryModule } from './discovery/discovery.module';
 
 @Module({
   imports: [
@@ -62,6 +63,7 @@ import { SocialModule } from './social/social.module';
     CommentsModule,
     SubscriptionsModule,
     SocialModule,
+    DiscoveryModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -605,6 +605,32 @@
         ]
       }
     },
+    "/categories": {
+      "get": {
+        "description": "Categorias fixas da plataforma, em ordem alfabética.",
+        "operationId": "CategoriesController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CategoryResponseDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Listar categorias",
+        "tags": [
+          "categories"
+        ]
+      }
+    },
     "/videos": {
       "post": {
         "description": "Cria o vídeo como rascunho (status uploading) no canal do usuário e devolve uma URL pré-assinada (single) ou um plano multipart (arquivos grandes, até 10GB). O arquivo é enviado direto ao storage; depois chame confirm (single) ou multipart/complete.",
@@ -2059,32 +2085,6 @@
         ]
       }
     },
-    "/categories": {
-      "get": {
-        "description": "Categorias fixas da plataforma, em ordem alfabética.",
-        "operationId": "CategoriesController_list",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/CategoryResponseDto"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "summary": "Listar categorias",
-        "tags": [
-          "categories"
-        ]
-      }
-    },
     "/videos/{id}/reactions": {
       "get": {
         "operationId": "VideoReactionsController_summary",
@@ -2965,6 +2965,138 @@
           "social"
         ]
       }
+    },
+    "/feed": {
+      "get": {
+        "description": "Vídeos públicos publicados, mais recentes primeiro; filtro opcional por categoria (slug).",
+        "operationId": "DiscoveryController_feed",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 50,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "category",
+            "required": false,
+            "in": "query",
+            "description": "Slug da categoria",
+            "schema": {
+              "example": "tecnologia",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedVideosResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Feed da home",
+        "tags": [
+          "discovery"
+        ]
+      }
+    },
+    "/search": {
+      "get": {
+        "description": "Busca por título do vídeo e nome/nickname do canal entre vídeos públicos publicados.",
+        "operationId": "DiscoveryController_search",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 50,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "Termo buscado no título do vídeo e no nome/nickname do canal",
+            "schema": {
+              "minLength": 2,
+              "maxLength": 100,
+              "example": "ffmpeg",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedVideosResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed (termo < 2 caracteres)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Buscar vídeos",
+        "tags": [
+          "discovery"
+        ]
+      }
     }
   },
   "info": {
@@ -3064,6 +3196,28 @@
             "nullable": true
           }
         }
+      },
+      "CategoryResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string",
+            "example": "Tecnologia"
+          },
+          "slug": {
+            "type": "string",
+            "example": "tecnologia"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "slug"
+        ]
       },
       "SingleUploadPlanDto": {
         "type": "object",
@@ -3171,28 +3325,6 @@
         "enum": [
           "public",
           "unlisted"
-        ]
-      },
-      "CategoryResponseDto": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "name": {
-            "type": "string",
-            "example": "Tecnologia"
-          },
-          "slug": {
-            "type": "string",
-            "example": "tecnologia"
-          }
-        },
-        "required": [
-          "id",
-          "name",
-          "slug"
         ]
       },
       "VideoChannelSummaryDto": {

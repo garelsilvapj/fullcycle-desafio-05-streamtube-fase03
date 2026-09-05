@@ -155,3 +155,19 @@ jobs:
           (cd next-frontend && npm run openapi:types)
           git diff --exit-code -- next-frontend/lib/api/types.gen.ts || {
             echo "::error::lib/api/types.gen.ts desatualizado — rode scripts/sync-openapi.sh e 'npm run openapi:types' e commite."; exit 1; }
+
+  # ---------------------------------------------------------------------------
+  # Imagens de produção (compose.prod.yaml) constroem — API e frontend.
+  # ---------------------------------------------------------------------------
+  prod-images:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Imagem da API
+        run: docker build -t streamtube-api ./nestjs-project
+      - name: Imagem do frontend
+        run: docker build -t streamtube-frontend ./next-frontend
+      - name: compose.prod.yaml é válido
+        run: |
+          cp .env.production.example .env.production
+          docker compose -f compose.prod.yaml --env-file .env.production config > /dev/null
