@@ -166,7 +166,7 @@ assert_eq "thumbnail é JPEG" "$(head -c 2 "$TMP/thumb.jpg" | od -An -tx1 | tr -
 # ---------- 7. autorização ----------
 section "7. Autorização (dono do canal)"
 assert_eq "outro usuário GET → 403" "$(status_of "$(api GET "/videos/$VIDEO_ID" "$OTHER")")" "403"
-assert_eq "outro usuário stream → 403" "$(status_of "$(api GET "/videos/$VIDEO_ID/stream" "$OTHER")")" "403"
+assert_eq "outro usuário stream (rascunho) → 404" "$(status_of "$(api GET "/videos/$VIDEO_ID/stream" "$OTHER")")" "404"
 assert_eq "outro usuário DELETE → 403" "$(status_of "$(api DELETE "/videos/$VIDEO_ID" "$OTHER")")" "403"
 assert_eq "id inexistente → 404" "$(status_of "$(api GET "/videos/00000000-0000-0000-0000-000000000000" "$OWNER")")" "404"
 assert_eq "id inválido → 400" "$(status_of "$(api GET "/videos/nao-e-uuid" "$OWNER")")" "400"
