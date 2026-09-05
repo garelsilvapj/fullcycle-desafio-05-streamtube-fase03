@@ -1,39 +1,32 @@
 import Link from "next/link";
 
+import { FeedGrid } from "@/components/discovery/feed-grid";
 import { Button } from "@/components/ui/button";
-import { getSession } from "@/lib/auth/session";
+import { getFeed, listCategories } from "@/lib/videos/server";
 
-// Página inicial mínima (a home com grid, busca e categorias é escopo da Fase 07).
-export default async function Home() {
-  const session = await getSession();
+export const dynamic = "force-dynamic";
+
+type Search = Promise<{ category?: string }>;
+
+/** Home: grid de vídeos públicos com filtro por categoria e "carregar mais" (Fase 07). */
+export default async function Home({ searchParams }: { searchParams: Search }) {
+  const { category } = await searchParams;
+  const slug = category && /^[a-z0-9-]{1,60}$/.test(category) ? category : undefined;
+  const [feed, categories] = await Promise.all([getFeed(1, 12, slug), listCategories()]);
 
   return (
-    <section className="flex flex-col items-start gap-4 py-12">
-      <h1 className="text-display text-foreground">StreamTube</h1>
-      <p className="max-w-xl text-body-lg text-muted-foreground">
-        Envie vídeos de até 10GB, acompanhe o processamento e assista com streaming.
-      </p>
-      <div className="flex gap-3">
-        {session.isLoggedIn ? (
-          <>
-            <Button asChild size="md">
-              <Link href="/upload">Enviar vídeo</Link>
-            </Button>
-            <Button asChild variant="outline" size="md">
-              <Link href="/videos">Meus vídeos</Link>
-            </Button>
-          </>
-        ) : (
-          <>
-            <Button asChild size="md">
-              <Link href="/signup">Criar conta</Link>
-            </Button>
-            <Button asChild variant="outline" size="md">
-              <Link href="/login">Entrar</Link>
-            </Button>
-          </>
-        )}
-      </div>
+    <section className="flex flex-col gap-6">
+      <nav aria-label="Categorias" data-slot="category-chips" className="flex flex-wrap gap-2">
+        <Button asChild size="sm" variant={!slug ? "secondary" : "ghost"}>
+          <Link href="/">Tudo</Link>
+        </Button>
+        {categories.map((c) => (
+          <Button key={c.id} asChild size="sm" variant={slug === c.slug ? "secondary" : "ghost"}>
+            <Link href={`/?category=${c.slug}`}>{c.name}</Link>
+          </Button>
+        ))}
+      </nav>
+      <FeedGrid key={slug ?? "all"} initial={feed} category={slug} />
     </section>
   );
 }

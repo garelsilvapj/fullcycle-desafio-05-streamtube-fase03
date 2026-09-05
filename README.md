@@ -137,7 +137,16 @@ Roteiro manual e cenários de resiliência em `docs/phases/phase-03-videos/manua
 
 ### CI
 
-`.github/workflows/ci.yml` roda em push/PR: API (typecheck, build, lint, unit + integração + e2e com Postgres/Redis/MinIO/Mailpit, frescor do `openapi.json`), worker (typecheck, build, testes na imagem com FFmpeg) e frontend (typecheck, lint, Vitest).
+`.github/workflows/ci.yml` roda em push/PR: API (typecheck, build, lint, unit + integração + e2e com Postgres/Redis/MinIO/Mailpit, frescor do `openapi.json`), worker (typecheck, build, testes na imagem com FFmpeg), frontend (typecheck, lint, Vitest, frescor dos tipos) e build das imagens de produção.
+
+### Produção
+
+```bash
+cp .env.production.example .env.production   # preencha os segredos
+docker compose -f compose.prod.yaml --env-file .env.production up -d --build
+```
+
+Runbook completo (topologia, proxy TLS, backups, atualização) em [`docs/deploy.md`](docs/deploy.md).
 
 ### Frontend (Vitest + Playwright)
 
@@ -240,6 +249,15 @@ Tela: `/watch/[slug]` (anônimo) com player, informações, descrição expansí
 
 Telas: reações, comentários e inscrição em `/watch/[slug]`, inscrição em `/c/[nickname]`, `/subscriptions` e contagens reais no Studio. Decisões em `docs/decisions/technical-decisions-phase-06-social.md`.
 
+### Home, busca e produção (Fase 07)
+
+| Método & Rota | Descrição |
+|---------------|-----------|
+| `GET /feed?category&page&limit` | Feed da home (públicos publicados; filtro por slug de categoria) |
+| `GET /search?q&page&limit` | Busca por título do vídeo e nome/nickname do canal (índices `pg_trgm`) |
+
+Telas: `/` (chips de categoria, grid, "carregar mais"), `/search?q=`, busca e navegação responsiva no header. Produção: `compose.prod.yaml` + `docs/deploy.md`. Decisões em `docs/decisions/technical-decisions-phase-07-home.md`.
+
 ## 🛠️ Estrutura do Projeto
 
 ```
@@ -295,7 +313,7 @@ green-field-ia-project/
 | **04** | Gerenciamento de Vídeos e Canal | ✅ Concluída (categorias, edição, publicação, thumbnail própria, Studio, canal público) — pendente alinhamento visual com o Figma |
 | **05** | Página de Visualização do Vídeo | ✅ Concluída (`/watch/[slug]` público, views, sugestões, download, unlisted por link) — pendente alinhamento visual com o Figma |
 | **06** | Interações Sociais (Likes, Comentários, Inscrições) | ✅ Concluída — pendente alinhamento visual com o Figma |
-| **07** | Página Inicial, Busca e Finalização | ⏳ Planejada |
+| **07** | Página Inicial, Busca e Finalização | ✅ Concluída (home com categorias e "carregar mais", busca, header responsivo, imagens/compose de produção, runbook) — pendente alinhamento visual com o Figma |
 
 Detalhes completos em `docs/project-plan.md`.
 

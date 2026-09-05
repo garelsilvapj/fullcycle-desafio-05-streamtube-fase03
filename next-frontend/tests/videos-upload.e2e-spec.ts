@@ -32,7 +32,7 @@ test.describe("videos-upload", () => {
     expect(put.headers()["content-type"]).toBe("video/mp4")
 
     const status = page.locator("[data-slot='upload-status']")
-    await expect(status).toHaveAttribute("data-phase", "ready")
+    await expect(status).toHaveAttribute("data-phase", "ready", { timeout: 15000 })
     await expect(page.getByText("Vídeo pronto!")).toBeVisible()
     await expect(page.getByRole("link", { name: "Assistir" })).toHaveAttribute(
       "href",

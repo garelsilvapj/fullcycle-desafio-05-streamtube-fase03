@@ -62,7 +62,47 @@ function videoById(id: string): Lookup {
   }
 }
 
+function publicFeed() {
+  return buildVideoList()
+    .filter((v) => v.isPublished && v.visibility === "public")
+    .map((v) => {
+      const { error: _error, ...pub } = v;
+      void _error;
+      return { ...pub, channel: { id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", nickname: "alice", name: "Alice" } };
+    });
+}
+
 export const handlers = [
+  // GET /feed — home (público); a categoria "vazia" devolve zero itens
+  http.get(`${env.API_URL}/feed`, ({ request }) => {
+    const url = new URL(request.url);
+    const category = url.searchParams.get("category");
+    const page = Number(url.searchParams.get("page") ?? 1);
+    const limit = Number(url.searchParams.get("limit") ?? 12);
+    const base = publicFeed();
+    // gera itens extras para exercitar "carregar mais"
+    const items = category === "vazia"
+      ? []
+      : [...base, ...Array.from({ length: 15 }, (_, i) => ({
+          ...base[0],
+          id: `55555555-5555-4555-8555-${String(i).padStart(12, "0")}`,
+          slug: `feedItem${String(i).padStart(4, "0")}`,
+          title: `Vídeo do feed ${i + 1}`,
+        }))].filter((v) => !category || category === "games" || v.category?.slug === category);
+    return HttpResponse.json<ListOk>({ items: items.slice((page - 1) * limit, page * limit), page, limit, total: items.length });
+  }),
+
+  // GET /search — busca (público)
+  http.get(`${env.API_URL}/search`, ({ request }) => {
+    const url = new URL(request.url);
+    const q = (url.searchParams.get("q") ?? "").toLowerCase();
+    if (q.length < 2) {
+      return HttpResponse.json(errorEnvelope(400, "VALIDATION_ERROR", "q must be longer than or equal to 2 characters"), { status: 400 });
+    }
+    const items = publicFeed().filter((v) => v.title.toLowerCase().includes(q) || "alice".includes(q));
+    return HttpResponse.json<ListOk>({ items, page: 1, limit: 12, total: items.length });
+  }),
+
   // GET /videos — painel paginado (page/limit/status/published)
   http.get(`${env.API_URL}/videos`, ({ request }) => {
     const url = new URL(request.url);

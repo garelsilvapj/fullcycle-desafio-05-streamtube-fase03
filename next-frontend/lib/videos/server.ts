@@ -9,6 +9,8 @@ import type {
   PublicChannel,
   PublicChannelVideos,
   RelatedVideos,
+  Feed,
+  SearchResults,
   Video,
   VideoSocial,
   VideoSocialStats,
@@ -147,4 +149,21 @@ export async function getSocialStats(videoIds: string[]): Promise<Map<string, Vi
   );
   if (!result || !result.data) return new Map();
   return new Map(result.data.map((s) => [s.videoId, s]));
+}
+
+// ─── Discovery (Fase 07) ────────────────────────────────────────────────────────
+
+export async function getFeed(page = 1, limit = 12, category?: string): Promise<Feed> {
+  const { data, error, response } = await upstream.GET("/feed", {
+    params: { query: { page, limit, ...(category ? { category } : {}) } },
+  });
+  if (error || !data) throw new Error(`Falha ao carregar o feed (${response.status})`);
+  return data;
+}
+
+export async function searchVideos(q: string, page = 1, limit = 12): Promise<SearchResults | "invalid"> {
+  const { data, error, response } = await upstream.GET("/search", { params: { query: { q, page, limit } } });
+  if (response.status === 400) return "invalid";
+  if (error || !data) throw new Error(`Falha na busca (${response.status})`);
+  return data;
 }
