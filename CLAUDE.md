@@ -92,6 +92,16 @@ Ver `docs/decisions/technical-decisions-phase-06-social.md` e `docs/phases/phase
 - Frontend: `components/social/{reaction-bar,comments-section,subscribe-button}.tsx`, página `/subscriptions`,
   BFF `app/api/{videos/[id]/{reaction,comments},comments/[id]/**,channels/by-id/[id]/subscription,me/subscriptions,social/videos/[id]}`.
 
+## Home, Busca e Produção (Fase 07)
+
+Ver `docs/decisions/technical-decisions-phase-07-home.md`, `docs/phases/phase-07-home/` e `docs/deploy.md`.
+
+- `src/discovery/`: `GET /feed` e `GET /search` públicos (`ILIKE` + índices `pg_trgm`; termo ≥ 2 chars).
+- Frontend: `app/(app)/page.tsx` (chips + `FeedGrid` com "carregar mais"), `app/(app)/search`, `SearchForm` no header
+  (GET nativo em `/search` antes da hidratação), `VideoCard` público reutilizável.
+- Produção: `nestjs-project/Dockerfile`, `next-frontend/Dockerfile` (`output: "standalone"`), `compose.prod.yaml`
+  (raiz) com `.env.production`; API com `helmet` e `enableShutdownHooks`. A CI constrói as imagens.
+
 ## Docker Networking
 
 This project runs entirely in Docker containers. When configuring connections between services (database, cache, queue, etc.), **always use the Docker Compose service name** as the host — never `localhost` or `127.0.0.1`.

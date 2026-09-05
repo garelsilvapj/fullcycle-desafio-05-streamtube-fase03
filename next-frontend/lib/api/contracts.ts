@@ -143,3 +143,9 @@ export type VideoSocial =
   paths["/social/videos/{id}"]["get"]["responses"][200]["content"]["application/json"];
 export type VideoSocialStats =
   paths["/social/videos"]["get"]["responses"][200]["content"]["application/json"][number];
+
+// ─── Discovery (Fase 07) ────────────────────────────────────────────────────────
+export type FeedQuery = NonNullable<paths["/feed"]["get"]["parameters"]["query"]>;
+export type Feed = paths["/feed"]["get"]["responses"][200]["content"]["application/json"];
+export type SearchResults =
+  paths["/search"]["get"]["responses"][200]["content"]["application/json"];
