@@ -36,8 +36,9 @@ describe('VideosService', () => {
     create: jest.fn((v: Partial<Video>) => v as Video),
     save: jest.fn((v: Video) => Promise.resolve(v)),
     remove: jest.fn((v: Video) => Promise.resolve(v)),
+    increment: jest.fn(() => Promise.resolve({ affected: 1 })),
     findOne: jest.fn(),
-    find: jest.fn(() => Promise.resolve([])),
+    find: jest.fn((): Promise<Video[]> => Promise.resolve([])),
     findAndCount: jest.fn(
       (): Promise<[Video[], number]> => Promise.resolve([[], 0]),
     ),
@@ -379,18 +380,37 @@ describe('VideosService', () => {
       );
     });
 
-    it('recusa vídeo de outro canal mesmo se ready', async () => {
+    it('esconde (404) vídeo de outro canal que não está publicado, mesmo se ready', async () => {
       channelRepo.findOne.mockResolvedValue(CH);
       videoRepo.findOne.mockResolvedValue(
         owned({
           channel_id: 'ch-OUTRO',
           status: VideoStatus.READY,
           processed_key: 'k',
+          published_at: null,
         }),
       );
       await expect(service.readyKey('user-1', 'v-1')).rejects.toBeInstanceOf(
-        VideoChannelForbiddenException,
+        VideoNotFoundException,
       );
+      await expect(service.readyKey(null, 'v-1')).rejects.toBeInstanceOf(
+        VideoNotFoundException,
+      );
+    });
+
+    it('serve vídeo publicado de outro canal para qualquer um (Fase 05)', async () => {
+      channelRepo.findOne.mockResolvedValue(CH);
+      videoRepo.findOne.mockResolvedValue(
+        owned({
+          channel_id: 'ch-OUTRO',
+          status: VideoStatus.READY,
+          processed_key: 'k',
+          published_at: new Date(),
+        }),
+      );
+      await expect(service.readyKey(null, 'v-1')).resolves.toMatchObject({
+        key: 'k',
+      });
     });
 
     it('devolve a chave processada quando ready', async () => {
@@ -559,6 +579,64 @@ describe('VideosService', () => {
       );
       channelRepo.findOne.mockResolvedValue(CH);
       await expect(service.thumbnailKey('user-1', 'v-1')).resolves.toBe('gen');
+    });
+  });
+
+  describe('visualização pública (Fase 05)', () => {
+    const published = () =>
+      owned({
+        channel_id: 'ch-OUTRO',
+        status: VideoStatus.READY,
+        processed_key: 'k',
+        published_at: new Date(),
+        category_id: 'cat-1',
+      });
+
+    it('getViewableBySlug resolve pelo slug e aplica a regra de visibilidade', async () => {
+      videoRepo.findOne.mockResolvedValue(published());
+      await expect(
+        service.getViewableBySlug(null, 'aB3dE5fG7hI'),
+      ).resolves.toMatchObject({
+        id: 'v-1',
+      });
+      videoRepo.findOne.mockResolvedValue(null);
+      await expect(
+        service.getViewableBySlug(null, 'nope'),
+      ).rejects.toBeInstanceOf(VideoNotFoundException);
+    });
+
+    it('registerView incrementa atomicamente só vídeos publicados', async () => {
+      videoRepo.findOne.mockResolvedValue(published());
+      await service.registerView('v-1');
+      expect(videoRepo.increment).toHaveBeenCalledWith(
+        { id: 'v-1' },
+        'views_count',
+        1,
+      );
+
+      videoRepo.findOne.mockResolvedValue(
+        owned({ status: VideoStatus.READY, published_at: null }),
+      );
+      channelRepo.findOne.mockResolvedValue(null);
+      await expect(service.registerView('v-1')).rejects.toBeInstanceOf(
+        VideoNotFoundException,
+      );
+    });
+
+    it('listRelated prioriza a mesma categoria e completa com recentes sem repetir', async () => {
+      videoRepo.findOne.mockResolvedValue(published());
+      const same = owned({ id: 'same' });
+      const recent1 = owned({ id: 'same' });
+      const recent2 = owned({ id: 'other' });
+      videoRepo.find
+        .mockResolvedValueOnce([same])
+        .mockResolvedValueOnce([recent1, recent2]);
+      const out = await service.listRelated('v-1', 2);
+      expect(out.map((v) => v.id)).toEqual(['same', 'other']);
+      const [firstCall] = videoRepo.find.mock.calls[0] as unknown as [
+        { where: Record<string, unknown> },
+      ];
+      expect(firstCall.where).toMatchObject({ category_id: 'cat-1' });
     });
   });
 });

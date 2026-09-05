@@ -30,6 +30,7 @@ import { CreateVideoDto } from './dto/create-video.dto';
 import { AbortMultipartDto, CompleteMultipartDto } from './dto/multipart.dto';
 import { UpdateVideoDto } from './dto/update-video.dto';
 import { ListVideosQueryDto } from './dto/list-videos.query.dto';
+import { RelatedVideosQueryDto } from './dto/related-videos.query.dto';
 import {
   CreateThumbnailUploadDto,
   ThumbnailUploadPlanDto,
@@ -467,6 +468,69 @@ export class VideosController {
     );
   }
 
+  @Public()
+  @Get('slug/:slug')
+  @ApiOperation({
+    summary: 'Vídeo pela URL única (público)',
+    description:
+      'Vídeo publicado (público ou não listado). Rascunhos só para o dono (Bearer opcional); os demais recebem 404.',
+  })
+  @ApiParam({ name: 'slug', example: 'aB3dE5fG7hI' })
+  @ApiResponse({ status: 200, type: VideoResponseDto })
+  @ApiResponse({
+    status: 404,
+    description: 'Vídeo não encontrado ou não publicado',
+    schema: errorRef,
+  })
+  async bySlug(
+    @CurrentUser() user: JwtPayload | undefined,
+    @Param('slug') slug: string,
+  ): Promise<VideoResponseDto> {
+    const video = await this.videos.getViewableBySlug(user?.sub ?? null, slug);
+    return toVideoResponse(video, { owner: false });
+  }
+
+  @Public()
+  @Post(':id/views')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({
+    summary: 'Registrar visualização',
+    description:
+      'Incrementa o contador do vídeo publicado. O player chama uma vez por reprodução.',
+  })
+  @ApiParam(ID_PARAM)
+  @ApiResponse({ status: 204, description: 'Visualização registrada' })
+  @ApiResponse({
+    status: 404,
+    description: 'Vídeo não encontrado ou não publicado',
+    schema: errorRef,
+  })
+  async registerView(@Param('id', ParseUUIDPipe) id: string): Promise<void> {
+    await this.videos.registerView(id);
+  }
+
+  @Public()
+  @Get(':id/related')
+  @ApiOperation({
+    summary: 'Vídeos relacionados',
+    description:
+      'Vídeos públicos publicados da mesma categoria (ou os mais recentes), excluindo o próprio.',
+  })
+  @ApiParam(ID_PARAM)
+  @ApiResponse({ status: 200, type: [VideoResponseDto] })
+  @ApiResponse({
+    status: 404,
+    description: 'Vídeo não encontrado ou não publicado',
+    schema: errorRef,
+  })
+  async related(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query() query: RelatedVideosQueryDto,
+  ): Promise<VideoResponseDto[]> {
+    const videos = await this.videos.listRelated(id, query.limit);
+    return videos.map((v) => toVideoResponse(v, { owner: false }));
+  }
+
   @Get(':id')
   @ApiOperation({
     summary: 'Consultar vídeo',
@@ -525,6 +589,7 @@ export class VideosController {
     );
   }
 
+  @Public()
   @Get(':id/download')
   @ApiOperation({
     summary: 'Baixar vídeo',
@@ -532,12 +597,6 @@ export class VideosController {
   })
   @ApiParam(ID_PARAM)
   @ApiResponse({ status: 302, description: 'Redirect para o arquivo' })
-  @ApiResponse({ status: 401, description: 'Unauthorized', schema: errorRef })
-  @ApiResponse({
-    status: 403,
-    description: 'Vídeo de outro canal',
-    schema: errorRef,
-  })
   @ApiResponse({
     status: 404,
     description: 'Vídeo não encontrado',
@@ -549,17 +608,18 @@ export class VideosController {
     schema: errorRef,
   })
   async download(
-    @CurrentUser() user: JwtPayload,
+    @CurrentUser() user: JwtPayload | undefined,
     @Param('id', ParseUUIDPipe) id: string,
     @Res() res: Response,
   ): Promise<void> {
-    const { key } = await this.videos.readyKey(user.sub, id);
+    const { key } = await this.videos.readyKey(user?.sub ?? null, id);
     res.redirect(
       HttpStatus.FOUND,
       await this.storage.createPresignedDownload(key),
     );
   }
 
+  @Public()
   @Get(':id/stream')
   @ApiOperation({
     summary: 'Streaming do vídeo',
@@ -569,12 +629,6 @@ export class VideosController {
   @ApiParam(ID_PARAM)
   @ApiResponse({ status: 200, description: 'Arquivo inteiro (video/mp4)' })
   @ApiResponse({ status: 206, description: 'Faixa parcial (Content-Range)' })
-  @ApiResponse({ status: 401, description: 'Unauthorized', schema: errorRef })
-  @ApiResponse({
-    status: 403,
-    description: 'Vídeo de outro canal',
-    schema: errorRef,
-  })
   @ApiResponse({
     status: 404,
     description: 'Vídeo não encontrado',
@@ -591,12 +645,12 @@ export class VideosController {
     schema: errorRef,
   })
   async stream(
-    @CurrentUser() user: JwtPayload,
+    @CurrentUser() user: JwtPayload | undefined,
     @Param('id', ParseUUIDPipe) id: string,
     @Headers('range') range: string | undefined,
     @Res() res: Response,
   ): Promise<void> {
-    const { video, key } = await this.videos.readyKey(user.sub, id);
+    const { video, key } = await this.videos.readyKey(user?.sub ?? null, id);
     const total = Number(video.size_bytes ?? 0);
     const parsed = parseRangeHeader(range, total);
 

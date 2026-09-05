@@ -237,9 +237,26 @@ assert_eq "canal público lista 1 após publicar" "$(body_of "$(api GET "/channe
 assert_eq "videosCount do canal" "$(body_of "$(api GET "/channels/$NICK")" | jq -r '.videosCount')" "1"
 assert_eq "thumbnail pública após publicar → 302" "$(curl -s -o /dev/null -w '%{http_code}' "$API/videos/$VIDEO_ID/thumbnail")" "302"
 assert_eq "painel filtra publicados" "$(body_of "$(api GET "/videos?published=true" "$OWNER")" | jq -r '.total')" "1"
+
+# ---------- 8d. visualização pública (Fase 05) ----------
+section "8d. Visualização pública: slug, stream anônimo, views e sugestões (Fase 05)"
+OUT=$(api GET "/videos/slug/$SLUG")
+assert_eq "GET /videos/slug/:slug anônimo (publicado)" "$(status_of "$OUT")" "200"
+assert_eq "canal no payload público" "$(body_of "$OUT" | jq -r '.channel.nickname')" "$NICK"
+assert_eq "payload público não expõe error" "$(body_of "$OUT" | jq -r 'has("error")')" "false"
+HDR=$(curl -s -D - -o /dev/null -H 'Range: bytes=0-99' "$API/videos/$VIDEO_ID/stream")
+assert_match "stream anônimo com Range → 206" "$(head -n1 <<<"$HDR")" ' 206 '
+assert_eq "download anônimo → 302" "$(curl -s -o /dev/null -w '%{http_code}' "$API/videos/$VIDEO_ID/download")" "302"
+for _ in 1 2 3; do api POST "/videos/$VIDEO_ID/views" >/dev/null; done
+assert_eq "3 views registradas" "$(body_of "$(api GET "/videos/slug/$SLUG")" | jq -r '.viewsCount')" "3"
+assert_eq "related responde 200 (lista)" "$(status_of "$(api GET "/videos/$VIDEO_ID/related?limit=4")")" "200"
+assert_eq "related não inclui o próprio vídeo" "$(body_of "$(api GET "/videos/$VIDEO_ID/related?limit=4")" | jq -r "[.[] | select(.id==\"$VIDEO_ID\")] | length")" "0"
+
 OUT=$(api POST "/videos/$VIDEO_ID/unpublish" "$OWNER")
 assert_eq "POST unpublish" "$(body_of "$OUT" | jq -r '.isPublished')" "false"
 assert_eq "canal público volta a 0" "$(body_of "$(api GET "/channels/$NICK/videos")" | jq -r '.total')" "0"
+assert_eq "após despublicar, slug anônimo → 404" "$(status_of "$(api GET "/videos/slug/$SLUG")")" "404"
+assert_eq "após despublicar, stream anônimo → 404" "$(curl -s -o /dev/null -w '%{http_code}' "$API/videos/$VIDEO_ID/stream")" "404"
 
 # ---------- 9. exclusão ----------
 section "9. Exclusão"

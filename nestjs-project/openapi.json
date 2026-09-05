@@ -1725,6 +1725,159 @@
         ]
       }
     },
+    "/videos/slug/{slug}": {
+      "get": {
+        "description": "Vídeo publicado (público ou não listado). Rascunhos só para o dono (Bearer opcional); os demais recebem 404.",
+        "operationId": "VideosController_bySlug",
+        "parameters": [
+          {
+            "name": "slug",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "example": "aB3dE5fG7hI",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VideoResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Vídeo não encontrado ou não publicado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Vídeo pela URL única (público)",
+        "tags": [
+          "videos"
+        ]
+      }
+    },
+    "/videos/{id}/views": {
+      "post": {
+        "description": "Incrementa o contador do vídeo publicado. O player chama uma vez por reprodução.",
+        "operationId": "VideosController_registerView",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "ID do vídeo",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Visualização registrada"
+          },
+          "404": {
+            "description": "Vídeo não encontrado ou não publicado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Registrar visualização",
+        "tags": [
+          "videos"
+        ]
+      }
+    },
+    "/videos/{id}/related": {
+      "get": {
+        "description": "Vídeos públicos publicados da mesma categoria (ou os mais recentes), excluindo o próprio.",
+        "operationId": "VideosController_related",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "ID do vídeo",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 20,
+              "default": 8,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/VideoResponseDto"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Vídeo não encontrado ou não publicado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Vídeos relacionados",
+        "tags": [
+          "videos"
+        ]
+      }
+    },
     "/videos/{id}/download": {
       "get": {
         "description": "Redireciona (302) para a URL pré-assinada do MP4 processado.",
@@ -1744,26 +1897,6 @@
         "responses": {
           "302": {
             "description": "Redirect para o arquivo"
-          },
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorEnvelope"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Vídeo de outro canal",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorEnvelope"
-                }
-              }
-            }
           },
           "404": {
             "description": "Vídeo não encontrado",
@@ -1819,26 +1952,6 @@
           },
           "206": {
             "description": "Faixa parcial (Content-Range)"
-          },
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorEnvelope"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Vídeo de outro canal",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorEnvelope"
-                }
-              }
-            }
           },
           "404": {
             "description": "Vídeo não encontrado",
