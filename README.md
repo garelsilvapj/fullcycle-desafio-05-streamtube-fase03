@@ -203,6 +203,20 @@ Telas e BFF (`next-frontend`, fatia `phase-03-videos-frontend`):
 - `/videos` — meus vídeos com status, thumbnail e auto-refresh; `/videos/[id]` — player HTML5 via `GET /api/videos/[id]/stream` (Range → 206), download, exclusão.
 - `app/api/videos/**` — Route Handlers com sessão + refresh transparente; `docs/decisions/technical-decisions-phase-03-videos-frontend.md`.
 
+### Gerenciamento de vídeos e canal (Fase 04)
+
+| Método & Rota | Descrição |
+|---------------|-----------|
+| `GET /categories` | Categorias fixas da plataforma (público) |
+| `PATCH /videos/:id` | Título, descrição, categoria e visibilidade (`public` / `unlisted`) |
+| `POST /videos/:id/publish` · `/unpublish` | Rascunho → publicado (exige `ready`) e volta |
+| `POST /videos/:id/thumbnail` · `/thumbnail/confirm` · `DELETE /videos/:id/thumbnail` | Thumbnail própria (JPEG/PNG/WebP ≤ 5MB) via URL pré-assinada |
+| `GET /videos?page&limit&status&published` | Painel paginado do canal |
+| `GET /channels/me` · `PATCH /channels/me` | Meu canal (nome, nickname único, descrição) |
+| `GET /channels/:nickname` · `GET /channels/:nickname/videos` | Página pública do canal (público) |
+
+Telas: `/studio` (painel), `/studio/videos/[id]` (editar/publicar/thumbnail), `/studio/channel` (canal) e `/c/[nickname]` (página pública, sem login). Decisões em `docs/decisions/technical-decisions-phase-04-management.md`.
+
 ## 🛠️ Estrutura do Projeto
 
 ```
@@ -255,7 +269,7 @@ green-field-ia-project/
 | **01** | Configuração Base do Projeto | ✅ Concluída |
 | **02** | Cadastro, Login e Gerenciamento de Conta | ✅ Concluída |
 | **03** | Upload e Processamento de Vídeos | ✅ Concluída (backend, worker, frontend, testes, CI) — histórico em [`docs/evolution-plan.md`](docs/evolution-plan.md) |
-| **04** | Gerenciamento de Vídeos e Canal | ⏳ Planejada |
+| **04** | Gerenciamento de Vídeos e Canal | ✅ Concluída (categorias, edição, publicação, thumbnail própria, Studio, canal público) — pendente alinhamento visual com o Figma |
 | **05** | Página de Visualização do Vídeo | ⏳ Planejada |
 | **06** | Interações Sociais (Likes, Comentários, Inscrições) | ⏳ Planejada |
 | **07** | Página Inicial, Busca e Finalização | ⏳ Planejada |

@@ -26,6 +26,22 @@ export async function withAuth<R extends { response: Response }>(
   return call({ Authorization: `Bearer ${refreshed.accessToken}` });
 }
 
+/**
+ * Rotas públicas com autenticação opcional (TD-04.5): envia o Bearer quando há sessão
+ * (ex.: dono vendo a thumbnail de um rascunho) e segue anônimo quando não há.
+ */
+export async function withOptionalAuth<R extends { response: Response }>(
+  call: (auth: Partial<AuthHeaders>) => Promise<R>,
+): Promise<R> {
+  const session = await getSession();
+  if (!session.isLoggedIn || !session.accessToken) return call({});
+  const first = await call({ Authorization: `Bearer ${session.accessToken}` });
+  if (first.response.status !== 401) return first;
+  if (!(await refreshOnce())) return call({});
+  const refreshed = await getSession();
+  return call({ Authorization: `Bearer ${refreshed.accessToken}` });
+}
+
 export function unauthorized(): NextResponse<ApiErrorEnvelope> {
   return NextResponse.json<ApiErrorEnvelope>(
     { statusCode: 401, error: "UNAUTHORIZED", message: "Session expired", code: null },

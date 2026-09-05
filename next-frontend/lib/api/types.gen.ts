@@ -200,6 +200,47 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/channels/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Meu canal */
+        get: operations["ChannelsController_me"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Editar meu canal
+         * @description Nome, nickname (único) e descrição do canal do usuário.
+         */
+        patch: operations["ChannelsController_updateMe"];
+        trace?: never;
+    };
+    "/channels/{nickname}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Página pública do canal
+         * @description Dados públicos do canal e a quantidade de vídeos publicados.
+         */
+        get: operations["ChannelsController_byNickname"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/videos": {
         parameters: {
             query?: never;
@@ -208,8 +249,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Listar meus vídeos
-         * @description Vídeos do canal do usuário autenticado, mais recentes primeiro.
+         * Listar meus vídeos (painel)
+         * @description Vídeos do canal do usuário autenticado, paginados, mais recentes primeiro. Filtros opcionais por status de processamento e publicação.
          */
         get: operations["VideosController_listMine"];
         put?: never;
@@ -305,6 +346,47 @@ export interface paths {
         delete: operations["VideosController_remove"];
         options?: never;
         head?: never;
+        /**
+         * Editar vídeo
+         * @description Título, descrição, categoria e visibilidade. `null` limpa descrição/categoria.
+         */
+        patch: operations["VideosController_update"];
+        trace?: never;
+    };
+    "/videos/{id}/publish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Publicar vídeo
+         * @description Só vídeos processados (ready). Idempotente: mantém a data da primeira publicação.
+         */
+        post: operations["VideosController_publish"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/videos/{id}/unpublish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Despublicar vídeo (volta a rascunho) */
+        post: operations["VideosController_unpublish"];
+        delete?: never;
+        options?: never;
+        head?: never;
         patch?: never;
         trace?: never;
     };
@@ -317,11 +399,36 @@ export interface paths {
         };
         /**
          * Thumbnail do vídeo
-         * @description Redireciona (302) para a URL pré-assinada da thumbnail gerada pelo worker.
+         * @description Redireciona (302) para a URL pré-assinada da thumbnail (própria ou gerada). Pública para vídeos publicados; o dono vê também os rascunhos (Bearer opcional).
          */
         get: operations["VideosController_thumbnail"];
         put?: never;
-        post?: never;
+        /**
+         * Iniciar upload de thumbnail própria
+         * @description Devolve uma URL pré-assinada para o PUT da imagem (JPEG/PNG/WebP, até 5MB). Depois chame thumbnail/confirm.
+         */
+        post: operations["VideosController_createThumbnailUpload"];
+        /** Remover thumbnail própria (volta à gerada pelo worker) */
+        delete: operations["VideosController_removeThumbnail"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/videos/{id}/thumbnail/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Confirmar thumbnail própria
+         * @description Valida a imagem enviada (existe, ≤ 5MB) e passa a usá-la no lugar da gerada.
+         */
+        post: operations["VideosController_confirmThumbnail"];
         delete?: never;
         options?: never;
         head?: never;
@@ -368,6 +475,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/channels/{nickname}/videos": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Vídeos públicos de um canal
+         * @description Só vídeos públicos, publicados e processados, mais recentes primeiro.
+         */
+        get: operations["ChannelVideosController_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/categories": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Listar categorias
+         * @description Categorias fixas da plataforma, em ordem alfabética.
+         */
+        get: operations["CategoriesController_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -378,6 +525,31 @@ export interface components {
         RefreshTokenDto: Record<string, never>;
         ForgotPasswordDto: Record<string, never>;
         ResetPasswordDto: Record<string, never>;
+        ChannelResponseDto: {
+            /** Format: uuid */
+            id: string;
+            /** @example Alice */
+            name: string;
+            /** @example alice */
+            nickname: string;
+            description: string | null;
+            /**
+             * @description Vídeos públicos publicados
+             * @example 3
+             */
+            videosCount: number;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        UpdateChannelDto: {
+            name?: string;
+            /**
+             * @description Minúsculas, dígitos e _ (3–50). "me" é reservado.
+             * @example alice_videos
+             */
+            nickname?: string;
+            description?: string | null;
+        };
         SingleUploadPlanDto: {
             /** @enum {string} */
             type: "single";
@@ -411,6 +583,24 @@ export interface components {
         };
         /** @enum {string} */
         VideoStatus: "uploading" | "uploaded" | "processing" | "ready" | "failed";
+        /** @enum {string} */
+        VideoVisibility: "public" | "unlisted";
+        CategoryResponseDto: {
+            /** Format: uuid */
+            id: string;
+            /** @example Tecnologia */
+            name: string;
+            /** @example tecnologia */
+            slug: string;
+        };
+        VideoChannelSummaryDto: {
+            /** Format: uuid */
+            id: string;
+            /** @example alice */
+            nickname: string;
+            /** @example Alice */
+            name: string;
+        };
         VideoResponseDto: {
             /** Format: uuid */
             id: string;
@@ -422,16 +612,27 @@ export interface components {
             title: string;
             description: string | null;
             status: components["schemas"]["VideoStatus"];
+            visibility: components["schemas"]["VideoVisibility"];
+            /** Format: date-time */
+            publishedAt: string | null;
+            /** @description true quando publicado (published_at preenchido) */
+            isPublished: boolean;
+            category: components["schemas"]["CategoryResponseDto"] | null;
+            channel?: components["schemas"]["VideoChannelSummaryDto"];
+            /** @example 0 */
+            viewsCount: number;
             durationSec: number | null;
             /** @description Tamanho em bytes do arquivo servido (original após confirmar; processado quando ready). */
             sizeBytes: number | null;
             /**
-             * @description Caminho relativo da thumbnail na API (null até o processamento).
+             * @description Caminho relativo da thumbnail na API (custom ou gerada; null até existir).
              * @example /videos/3f2b.../thumbnail
              */
             thumbnailUrl: string | null;
+            /** @description true quando o dono enviou uma thumbnail própria */
+            hasCustomThumbnail: boolean;
             /** @description Último erro de processamento. Presente apenas para o dono do canal. */
-            error: string | null;
+            error?: string | null;
             /** Format: date-time */
             createdAt: string;
             /** Format: date-time */
@@ -459,6 +660,33 @@ export interface components {
         AbortMultipartDto: {
             /** @description uploadId devolvido no registro do vídeo. */
             uploadId: string;
+        };
+        PaginatedVideosResponseDto: {
+            items: components["schemas"]["VideoResponseDto"][];
+            /** @example 1 */
+            page: number;
+            /** @example 20 */
+            limit: number;
+            /** @example 42 */
+            total: number;
+        };
+        UpdateVideoDto: {
+            title?: string;
+            description?: string | null;
+            /** Format: uuid */
+            categoryId?: string | null;
+            visibility?: components["schemas"]["VideoVisibility"];
+        };
+        CreateThumbnailUploadDto: {
+            /**
+             * @example image/jpeg
+             * @enum {string}
+             */
+            contentType: "image/jpeg" | "image/png" | "image/webp";
+        };
+        ThumbnailUploadPlanDto: {
+            /** @description URL pré-assinada para o PUT da imagem (máx. 5MB). */
+            url: string;
         };
         ApiErrorEnvelope: {
             /** @example 401 */
@@ -840,7 +1068,7 @@ export interface operations {
             };
         };
     };
-    VideosController_listMine: {
+    ChannelsController_me: {
         parameters: {
             query?: never;
             header?: never;
@@ -854,7 +1082,148 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["VideoResponseDto"][];
+                    "application/json": components["schemas"]["ChannelResponseDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Canal não encontrado */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    ChannelsController_updateMe: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateChannelDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChannelResponseDto"];
+                };
+            };
+            /** @description Validation failed */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Canal não encontrado */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Nickname já em uso */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    ChannelsController_byNickname: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                nickname: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChannelResponseDto"];
+                };
+            };
+            /** @description Canal não encontrado */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    VideosController_listMine: {
+        parameters: {
+            query?: {
+                page?: number;
+                limit?: number;
+                status?: components["schemas"]["VideoStatus"];
+                /** @description true = só publicados; false = só rascunhos */
+                published?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginatedVideosResponseDto"];
+                };
+            };
+            /** @description Validation failed */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
                 };
             };
             /** @description Unauthorized */
@@ -1259,7 +1628,69 @@ export interface operations {
             };
         };
     };
-    VideosController_thumbnail: {
+    VideosController_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description ID do vídeo */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateVideoDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VideoResponseDto"];
+                };
+            };
+            /** @description Validation failed */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Vídeo de outro canal */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Vídeo ou categoria não encontrado */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    VideosController_publish: {
         parameters: {
             query?: never;
             header?: never;
@@ -1271,12 +1702,13 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Redirect para a thumbnail */
-            302: {
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["VideoResponseDto"];
+                };
             };
             /** @description Unauthorized */
             401: {
@@ -1305,8 +1737,265 @@ export interface operations {
                     "application/json": components["schemas"]["ApiErrorEnvelope"];
                 };
             };
+            /** @description Vídeo ainda não processado */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    VideosController_unpublish: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description ID do vídeo */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VideoResponseDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Vídeo de outro canal */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Vídeo não encontrado */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    VideosController_thumbnail: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description ID do vídeo */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Redirect para a thumbnail */
+            302: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Vídeo não encontrado ou não publicado */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
             /** @description Thumbnail ainda não gerada */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    VideosController_createThumbnailUpload: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description ID do vídeo */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateThumbnailUploadDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ThumbnailUploadPlanDto"];
+                };
+            };
+            /** @description Validation failed */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Vídeo de outro canal */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Vídeo não encontrado */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    VideosController_removeThumbnail: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description ID do vídeo */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VideoResponseDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Vídeo de outro canal */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Vídeo não encontrado */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    VideosController_confirmThumbnail: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description ID do vídeo */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VideoResponseDto"];
+                };
+            };
+            /** @description Thumbnail inválida */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Vídeo de outro canal */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Vídeo não encontrado */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -1442,6 +2131,58 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    ChannelVideosController_list: {
+        parameters: {
+            query?: {
+                page?: number;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                nickname: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginatedVideosResponseDto"];
+                };
+            };
+            /** @description Canal não encontrado */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    CategoriesController_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CategoryResponseDto"][];
                 };
             };
         };
