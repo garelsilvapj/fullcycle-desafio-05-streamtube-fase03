@@ -81,6 +81,17 @@ Ver `docs/decisions/technical-decisions-phase-05-watch.md` e `docs/phases/phase-
   `app/api/videos/[id]/{related,views}`; stream/download/thumbnail do BFF usam `withOptionalAuth`.
 - **MSW**: o dev server carrega os handlers só no boot (`instrumentation.ts`) — reinicie-o após mudar `mocks/`.
 
+## Interações Sociais (Fase 06)
+
+Ver `docs/decisions/technical-decisions-phase-06-social.md` e `docs/phases/phase-06-social/`.
+
+- Módulos `src/reactions` (vídeo/comentário, upsert idempotente), `src/comments` (1 nível de resposta,
+  exclusão lógica, autor = canal `{id, nickname, name}`), `src/subscriptions` (sem auto-inscrição) e
+  `src/social` (agregados `GET /social/videos/:id` e `GET /social/videos?ids=`; evita ciclo com `VideosModule`).
+- Interações exigem vídeo visível (`getViewable`); leituras são públicas com auth opcional.
+- Frontend: `components/social/{reaction-bar,comments-section,subscribe-button}.tsx`, página `/subscriptions`,
+  BFF `app/api/{videos/[id]/{reaction,comments},comments/[id]/**,channels/by-id/[id]/subscription,me/subscriptions,social/videos/[id]}`.
+
 ## Docker Networking
 
 This project runs entirely in Docker containers. When configuring connections between services (database, cache, queue, etc.), **always use the Docker Compose service name** as the host — never `localhost` or `127.0.0.1`.

@@ -3,7 +3,8 @@ import { notFound } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
 import { PublicVideoGrid } from "@/components/videos/public-video-grid";
-import { getPublicChannel, listPublicChannelVideos } from "@/lib/videos/server";
+import { SubscribeButton } from "@/components/social/subscribe-button";
+import { getPublicChannel, getSubscriptionState, listPublicChannelVideos } from "@/lib/videos/server";
 
 export const dynamic = "force-dynamic";
 
@@ -22,6 +23,7 @@ export default async function PublicChannelPage({ params, searchParams }: Props)
     listPublicChannelVideos(nickname, page),
   ]);
   if (channel === "not-found" || videos === "not-found") notFound();
+  const subscription = await getSubscriptionState(channel.id);
   const totalPages = Math.max(1, Math.ceil(videos.total / videos.limit));
 
   return (
@@ -31,6 +33,7 @@ export default async function PublicChannelPage({ params, searchParams }: Props)
         <p className="text-body-md text-muted-foreground">
           @{channel.nickname} · {channel.videosCount} vídeo{channel.videosCount === 1 ? "" : "s"}
         </p>
+        <SubscribeButton channelId={channel.id} initial={subscription} />
         {channel.description && (
           <p className="max-w-2xl whitespace-pre-line text-body-md text-foreground">{channel.description}</p>
         )}

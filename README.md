@@ -228,6 +228,18 @@ Telas: `/studio` (painel), `/studio/videos/[id]` (editar/publicar/thumbnail), `/
 
 Tela: `/watch/[slug]` (anônimo) com player, informações, descrição expansível, download, link do canal e sidebar de sugestões. Decisões em `docs/decisions/technical-decisions-phase-05-watch.md`.
 
+### Interações sociais (Fase 06)
+
+| Método & Rota | Descrição |
+|---------------|-----------|
+| `GET /videos/:id/reactions` · `PUT/DELETE /videos/:id/reaction` | Likes/dislikes do vídeo (1 por usuário; PUT troca) |
+| `GET/POST /videos/:id/comments` · `POST /comments/:id/replies` · `DELETE /comments/:id` | Comentários com 1 nível de resposta; exclusão lógica pelo autor |
+| `PUT/DELETE /comments/:id/reaction` | Likes/dislikes em comentários |
+| `GET/PUT/DELETE /channels/:id/subscription` · `GET /me/subscriptions` | Inscrições (sem auto-inscrição) e canais seguidos com últimos vídeos |
+| `GET /social/videos/:id` · `GET /social/videos?ids=` | Agregados (reações, comentários, inscrição) para a página e o painel |
+
+Telas: reações, comentários e inscrição em `/watch/[slug]`, inscrição em `/c/[nickname]`, `/subscriptions` e contagens reais no Studio. Decisões em `docs/decisions/technical-decisions-phase-06-social.md`.
+
 ## 🛠️ Estrutura do Projeto
 
 ```
@@ -282,7 +294,7 @@ green-field-ia-project/
 | **03** | Upload e Processamento de Vídeos | ✅ Concluída (backend, worker, frontend, testes, CI) — histórico em [`docs/evolution-plan.md`](docs/evolution-plan.md) |
 | **04** | Gerenciamento de Vídeos e Canal | ✅ Concluída (categorias, edição, publicação, thumbnail própria, Studio, canal público) — pendente alinhamento visual com o Figma |
 | **05** | Página de Visualização do Vídeo | ✅ Concluída (`/watch/[slug]` público, views, sugestões, download, unlisted por link) — pendente alinhamento visual com o Figma |
-| **06** | Interações Sociais (Likes, Comentários, Inscrições) | ⏳ Planejada |
+| **06** | Interações Sociais (Likes, Comentários, Inscrições) | ✅ Concluída — pendente alinhamento visual com o Figma |
 | **07** | Página Inicial, Busca e Finalização | ⏳ Planejada |
 
 Detalhes completos em `docs/project-plan.md`.

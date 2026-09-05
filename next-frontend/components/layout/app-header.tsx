@@ -29,6 +29,9 @@ function AppHeader() {
             <Button asChild variant="ghost" size="sm">
               <Link href="/studio">Studio</Link>
             </Button>
+            <Button asChild variant="ghost" size="sm">
+              <Link href="/subscriptions">Inscrições</Link>
+            </Button>
             <Button asChild size="sm">
               <Link href="/upload">Enviar vídeo</Link>
             </Button>
