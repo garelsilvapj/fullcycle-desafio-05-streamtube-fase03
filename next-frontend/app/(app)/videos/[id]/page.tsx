@@ -51,6 +51,9 @@ export default async function VideoPage({ params }: { params: Promise<{ id: stri
         </div>
         <p className="text-caption text-muted-foreground">
           {formatDuration(video.durationSec)} · {formatBytes(video.sizeBytes)} · /watch/{video.slug}
+          {" · "}
+          {video.isPublished ? "publicado" : "rascunho"} · {video.visibility === "unlisted" ? "não listado" : "público"}
+          {video.category ? ` · ${video.category.name}` : ""}
         </p>
         {video.description && (
           <p className="whitespace-pre-line text-body-md text-foreground">{video.description}</p>
@@ -67,6 +70,11 @@ export default async function VideoPage({ params }: { params: Promise<{ id: stri
         )}
         <Button asChild variant="ghost" size="sm">
           <Link href="/videos">Voltar para meus vídeos</Link>
+        </Button>
+        <Button asChild variant="ghost" size="sm">
+          <Link href={`/studio/videos/${video.id}`} data-slot="edit-link">
+            Editar no Studio
+          </Link>
         </Button>
         {video.status !== "processing" && <DeleteVideoButton videoId={video.id} />}
       </div>
