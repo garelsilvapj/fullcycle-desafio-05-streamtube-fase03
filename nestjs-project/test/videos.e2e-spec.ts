@@ -230,7 +230,7 @@ describe('Videos (e2e)', () => {
     it('rejects every route without a bearer token', async () => {
       await http().get('/videos').expect(401);
       await http().post('/videos').send({ title: 'x' }).expect(401);
-      await http().get(`/videos/${NIL_UUID}/stream`).expect(401);
+      await http().get(`/videos/${NIL_UUID}/stream`).expect(404); // pública (Fase 05)
       await http().delete(`/videos/${NIL_UUID}`).expect(401);
     });
   });
@@ -395,7 +395,6 @@ describe('Videos (e2e)', () => {
         () => http().get(`/videos/${video.id}`),
         () => http().post(`/videos/${video.id}/confirm`),
         () => http().delete(`/videos/${video.id}`),
-        () => http().get(`/videos/${video.id}/stream`),
       ];
       for (const call of calls) {
         const res = await call()
@@ -403,6 +402,11 @@ describe('Videos (e2e)', () => {
           .expect(403);
         expect(body<ErrorBody>(res).error).toBe('VIDEO_CHANNEL_FORBIDDEN');
       }
+      // Rotas de visualização são públicas (Fase 05): um rascunho de terceiro não é revelado.
+      await http()
+        .get(`/videos/${video.id}/stream`)
+        .set('Authorization', `Bearer ${intruder}`)
+        .expect(404);
 
       const notFound = await http()
         .get(`/videos/${NIL_UUID}`)
