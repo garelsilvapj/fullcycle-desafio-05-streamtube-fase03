@@ -252,6 +252,26 @@ assert_eq "3 views registradas" "$(body_of "$(api GET "/videos/slug/$SLUG")" | j
 assert_eq "related responde 200 (lista)" "$(status_of "$(api GET "/videos/$VIDEO_ID/related?limit=4")")" "200"
 assert_eq "related não inclui o próprio vídeo" "$(body_of "$(api GET "/videos/$VIDEO_ID/related?limit=4")" | jq -r "[.[] | select(.id==\"$VIDEO_ID\")] | length")" "0"
 
+# ---------- 8e. interações sociais (Fase 06) ----------
+section "8e. Reações, comentários e inscrições (Fase 06)"
+CHANNEL_ID=$(body_of "$(api GET /channels/me "$OWNER")" | jq -r '.id')
+OUT=$(api PUT "/videos/$VIDEO_ID/reaction" "$OTHER" '{"type":"like"}')
+assert_eq "PUT reaction (outro usuário) → 200" "$(status_of "$OUT")" "200"
+assert_eq "like contado com myReaction" "$(body_of "$OUT" | jq -r '[.likes, .myReaction] | join(",")')" "1,like"
+assert_eq "anônimo lê contagem" "$(body_of "$(api GET "/videos/$VIDEO_ID/reactions")" | jq -r '.likes')" "1"
+assert_eq "reagir sem token → 401" "$(status_of "$(api PUT "/videos/$VIDEO_ID/reaction" "" '{"type":"like"}')")" "401"
+ROOT_ID=$(body_of "$(api POST "/videos/$VIDEO_ID/comments" "$OTHER" '{"body":"Primeiro comentário"}')" | jq -r '.id')
+assert_match "comentário criado" "$ROOT_ID" '^[0-9a-f-]{36}$'
+REPLY_ID=$(body_of "$(api POST "/comments/$ROOT_ID/replies" "$OWNER" '{"body":"Resposta do dono"}')" | jq -r '.id')
+assert_match "resposta criada" "$REPLY_ID" '^[0-9a-f-]{36}$'
+assert_eq "resposta de resposta → 400" "$(status_of "$(api POST "/comments/$REPLY_ID/replies" "$OTHER" '{"body":"x"}')")" "400"
+assert_eq "lista pública: 2 comentários" "$(body_of "$(api GET "/videos/$VIDEO_ID/comments")" | jq -r '.commentsCount')" "2"
+assert_eq "excluir comentário alheio → 403" "$(status_of "$(api DELETE "/comments/$ROOT_ID" "$OWNER")")" "403"
+assert_eq "auto-inscrição → 409" "$(status_of "$(api PUT "/channels/$CHANNEL_ID/subscription" "$OWNER")")" "409"
+assert_eq "inscrição de outro usuário" "$(body_of "$(api PUT "/channels/$CHANNEL_ID/subscription" "$OTHER")" | jq -r '[.subscribed, .subscribersCount] | join(",")')" "true,1"
+assert_eq "/me/subscriptions lista o canal" "$(body_of "$(api GET /me/subscriptions "$OTHER")" | jq -r 'length')" "1"
+assert_eq "agregado social público" "$(body_of "$(api GET "/social/videos/$VIDEO_ID")" | jq -r '[.reactions.likes, .commentsCount, .subscription.subscribersCount] | join(",")')" "1,2,1"
+
 OUT=$(api POST "/videos/$VIDEO_ID/unpublish" "$OWNER")
 assert_eq "POST unpublish" "$(body_of "$OUT" | jq -r '.isPublished')" "false"
 assert_eq "canal público volta a 0" "$(body_of "$(api GET "/channels/$NICK/videos")" | jq -r '.total')" "0"
