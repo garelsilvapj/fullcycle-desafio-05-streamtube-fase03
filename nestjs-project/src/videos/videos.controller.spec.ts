@@ -37,7 +37,9 @@ describe('VideosController', () => {
     completeMultipart: jest.fn(() => Promise.resolve(video)),
     abortMultipart: jest.fn(() => Promise.resolve(undefined)),
     delete: jest.fn(() => Promise.resolve(undefined)),
-    listMine: jest.fn(() => Promise.resolve([video])),
+    listMine: jest.fn(() =>
+      Promise.resolve({ items: [video], page: 1, limit: 20, total: 1 }),
+    ),
     getOwned: jest.fn(() => Promise.resolve(video)),
   };
   const storage = {};
@@ -94,8 +96,9 @@ describe('VideosController', () => {
     const one = await controller.get(user, 'v-1');
     expect(videos.getOwned).toHaveBeenCalledWith('user-1', 'v-1');
     expect(one).toHaveProperty('error', null);
-    const list = await controller.listMine(user);
-    expect(list).toHaveLength(1);
-    expect(list[0].createdAt).toBe('2026-01-01T00:00:00.000Z');
+    const list = await controller.listMine(user, { page: 1, limit: 20 });
+    expect(list.items).toHaveLength(1);
+    expect(list.total).toBe(1);
+    expect(list.items[0].createdAt).toBe('2026-01-01T00:00:00.000Z');
   });
 });

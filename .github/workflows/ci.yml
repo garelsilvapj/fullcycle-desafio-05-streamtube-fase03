@@ -84,10 +84,12 @@ jobs:
         run: npx prettier --check "src/**/*.ts" "test/**/*.ts"
       - name: Migrations
         run: npm run migration:run
+      # --forceExit: handle aberto intermitente (BullMQ/ioredis) após a suíte completa — ver
+      # docs/phases/phase-04-management/progress.md (pendências).
       - name: Testes unitários + integração
-        run: npx jest --runInBand
+        run: npx jest --runInBand --forceExit
       - name: Testes e2e
-        run: npm run test:e2e
+        run: npm run test:e2e -- --forceExit
       - name: OpenAPI está atualizado no repositório
         run: |
           npm run openapi:export

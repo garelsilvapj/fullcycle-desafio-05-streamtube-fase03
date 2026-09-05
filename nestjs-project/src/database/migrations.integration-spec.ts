@@ -8,6 +8,9 @@ import { CreateUsersAndChannels1775687773260 } from './migrations/1775687773260-
 import { CreateAuthTokens1777579850478 } from './migrations/1777579850478-CreateAuthTokens';
 import { CreateVideosTable1780000000000 } from './migrations/1780000000000-CreateVideosTable';
 import { AddVideoSlug1781000000000 } from './migrations/1781000000000-AddVideoSlug';
+import { CreateCategories1782000000000 } from './migrations/1782000000000-CreateCategories';
+import { AddVideoManagementColumns1783000000000 } from './migrations/1783000000000-AddVideoManagementColumns';
+import { Category } from '../categories/entities/category.entity';
 import { createTestDataSource } from '../test/create-test-data-source';
 
 const ALL_MIGRATIONS = [
@@ -15,6 +18,8 @@ const ALL_MIGRATIONS = [
   CreateAuthTokens1777579850478,
   CreateVideosTable1780000000000,
   AddVideoSlug1781000000000,
+  CreateCategories1782000000000,
+  AddVideoManagementColumns1783000000000,
 ];
 
 const MANAGED_TABLES = [
@@ -23,10 +28,15 @@ const MANAGED_TABLES = [
   'refresh_tokens',
   'verification_tokens',
   'videos',
+  'categories',
 ];
 
 // Tipos criados por CREATE TYPE nas migrations; DROP TABLE não os remove.
-const MANAGED_TYPES = ['verification_tokens_type_enum', 'videos_status_enum'];
+const MANAGED_TYPES = [
+  'verification_tokens_type_enum',
+  'videos_status_enum',
+  'videos_visibility_enum',
+];
 
 async function listTables(dataSource: DataSource): Promise<string[]> {
   const rows = await dataSource.query<{ table_name: string }[]>(
@@ -56,7 +66,7 @@ describe('Database migrations (integration)', () => {
 
   beforeAll(async () => {
     dataSource = createTestDataSource(
-      [User, Channel, RefreshToken, VerificationToken, Video],
+      [User, Channel, RefreshToken, VerificationToken, Video, Category],
       { synchronize: false, migrations: ALL_MIGRATIONS },
     );
     await dataSource.initialize();
@@ -83,6 +93,7 @@ describe('Database migrations (integration)', () => {
       ALL_MIGRATIONS.map((m) => m.name),
     );
     expect(await listTables(dataSource)).toEqual([
+      'categories',
       'channels',
       'refresh_tokens',
       'users',
@@ -90,6 +101,11 @@ describe('Database migrations (integration)', () => {
       'videos',
     ]);
     expect(await hasColumn(dataSource, 'videos', 'slug')).toBe(true);
+    expect(await hasColumn(dataSource, 'videos', 'published_at')).toBe(true);
+    const categories = await dataSource.query<{ count: string }[]>(
+      'SELECT count(*)::text AS count FROM "categories"',
+    );
+    expect(Number(categories[0].count)).toBe(8);
   });
 
   it('should be idempotent: running again applies nothing', async () => {
@@ -97,7 +113,13 @@ describe('Database migrations (integration)', () => {
     expect(ranMigrations).toHaveLength(0);
   });
 
-  it('should revert the slug migration and then the videos table', async () => {
+  it('should revert the management, categories, slug and videos migrations in order', async () => {
+    await dataSource.undoLastMigration();
+    expect(await hasColumn(dataSource, 'videos', 'published_at')).toBe(false);
+
+    await dataSource.undoLastMigration();
+    expect(await listTables(dataSource)).not.toContain('categories');
+
     await dataSource.undoLastMigration();
     expect(await hasColumn(dataSource, 'videos', 'slug')).toBe(false);
 

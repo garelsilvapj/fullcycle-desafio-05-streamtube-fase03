@@ -170,8 +170,8 @@ assert_eq "outro usuário stream → 403" "$(status_of "$(api GET "/videos/$VIDE
 assert_eq "outro usuário DELETE → 403" "$(status_of "$(api DELETE "/videos/$VIDEO_ID" "$OTHER")")" "403"
 assert_eq "id inexistente → 404" "$(status_of "$(api GET "/videos/00000000-0000-0000-0000-000000000000" "$OWNER")")" "404"
 assert_eq "id inválido → 400" "$(status_of "$(api GET "/videos/nao-e-uuid" "$OWNER")")" "400"
-assert_eq "GET /videos lista 1 vídeo do dono" "$(body_of "$(api GET /videos "$OWNER")" | jq 'length')" "1"
-assert_eq "GET /videos do outro usuário é vazio" "$(body_of "$(api GET /videos "$OTHER")" | jq 'length')" "0"
+assert_eq "GET /videos lista 1 vídeo do dono" "$(body_of "$(api GET /videos "$OWNER")" | jq -r '.total')" "1"
+assert_eq "GET /videos do outro usuário é vazio" "$(body_of "$(api GET /videos "$OTHER")" | jq -r '.total')" "0"
 
 # ---------- 8. multipart ----------
 if [[ $SKIP_MULTIPART -eq 0 ]]; then
@@ -216,6 +216,30 @@ if [[ $SKIP_MULTIPART -eq 0 ]]; then
   assert_eq "abort → 204" "$(status_of "$(api POST "/videos/$AB_ID/multipart/abort" "$OWNER" "{\"uploadId\":\"$AB_UP\"}")")" "204"
   assert_eq "vídeo cancelado some (404)" "$(status_of "$(api GET "/videos/$AB_ID" "$OWNER")")" "404"
 fi
+
+# ---------- 8c. gerenciamento (Fase 04): editar, publicar, página pública ----------
+section "8c. Edição, publicação e página pública do canal (Fase 04)"
+CATEGORY_ID=$(body_of "$(api GET /categories)" | jq -r '.[0].id')
+CATEGORY_SLUG=$(body_of "$(api GET /categories)" | jq -r '.[0].slug')
+assert_match "GET /categories público" "$CATEGORY_ID" '^[0-9a-f-]{36}$'
+OUT=$(api PATCH "/videos/$VIDEO_ID" "$OWNER" "{\"title\":\"Smoke editado\",\"categoryId\":\"$CATEGORY_ID\",\"visibility\":\"public\"}")
+assert_eq "PATCH /videos/:id" "$(status_of "$OUT")" "200"
+assert_eq "título editado" "$(body_of "$OUT" | jq -r '.title')" "Smoke editado"
+assert_eq "categoria aplicada" "$(body_of "$OUT" | jq -r '.category.slug')" "$CATEGORY_SLUG"
+NICK=$(body_of "$(api GET /channels/me "$OWNER")" | jq -r '.nickname')
+assert_match "GET /channels/me" "$NICK" '^[a-z0-9_]+$'
+assert_eq "thumbnail de rascunho é 404 para anônimo" "$(curl -s -o /dev/null -w '%{http_code}' "$API/videos/$VIDEO_ID/thumbnail")" "404"
+assert_eq "canal público lista 0 antes de publicar" "$(body_of "$(api GET "/channels/$NICK/videos")" | jq -r '.total')" "0"
+OUT=$(api POST "/videos/$VIDEO_ID/publish" "$OWNER")
+assert_eq "POST publish" "$(status_of "$OUT")" "200"
+assert_eq "isPublished" "$(body_of "$OUT" | jq -r '.isPublished')" "true"
+assert_eq "canal público lista 1 após publicar" "$(body_of "$(api GET "/channels/$NICK/videos")" | jq -r '.total')" "1"
+assert_eq "videosCount do canal" "$(body_of "$(api GET "/channels/$NICK")" | jq -r '.videosCount')" "1"
+assert_eq "thumbnail pública após publicar → 302" "$(curl -s -o /dev/null -w '%{http_code}' "$API/videos/$VIDEO_ID/thumbnail")" "302"
+assert_eq "painel filtra publicados" "$(body_of "$(api GET "/videos?published=true" "$OWNER")" | jq -r '.total')" "1"
+OUT=$(api POST "/videos/$VIDEO_ID/unpublish" "$OWNER")
+assert_eq "POST unpublish" "$(body_of "$OUT" | jq -r '.isPublished')" "false"
+assert_eq "canal público volta a 0" "$(body_of "$(api GET "/channels/$NICK/videos")" | jq -r '.total')" "0"
 
 # ---------- 9. exclusão ----------
 section "9. Exclusão"
