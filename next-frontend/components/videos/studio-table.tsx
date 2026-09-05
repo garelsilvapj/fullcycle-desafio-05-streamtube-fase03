@@ -3,7 +3,7 @@ import Link from "next/link"
 
 import { Button } from "@/components/ui/button"
 import { VideoStatusBadge } from "@/components/videos/video-status-badge"
-import type { PaginatedVideos } from "@/lib/api/contracts"
+import type { PaginatedVideos, VideoSocialStats } from "@/lib/api/contracts"
 import { formatDuration, formatRelative } from "@/lib/videos/format"
 
 function pageHref(base: string, page: number, params: Record<string, string | undefined>) {
@@ -17,9 +17,11 @@ function pageHref(base: string, page: number, params: Record<string, string | un
 function StudioTable({
   data,
   filters,
+  stats = new Map(),
 }: {
   data: PaginatedVideos
   filters: { status?: string; published?: string }
+  stats?: Map<string, VideoSocialStats>
 }) {
   const totalPages = Math.max(1, Math.ceil(data.total / data.limit))
 
@@ -82,8 +84,8 @@ function StudioTable({
                   )}
                 </td>
                 <td className="px-3 py-2 text-right">{video.viewsCount}</td>
-                <td className="px-3 py-2 text-right text-muted-foreground">0</td>
-                <td className="px-3 py-2 text-right text-muted-foreground">0</td>
+                <td className="px-3 py-2 text-right" data-slot="likes-count">{stats.get(video.id)?.likes ?? 0}</td>
+                <td className="px-3 py-2 text-right" data-slot="comments-count">{stats.get(video.id)?.commentsCount ?? 0}</td>
                 <td className="px-3 py-2 text-muted-foreground">{formatRelative(video.createdAt)}</td>
                 <td className="px-3 py-2 text-right">
                   <Button asChild variant="ghost" size="sm">

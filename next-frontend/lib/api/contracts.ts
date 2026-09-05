@@ -122,3 +122,24 @@ export type VideoVisibility = Video["visibility"];
 // ─── Watch (Fase 05) ────────────────────────────────────────────────────────────
 export type RelatedVideos =
   paths["/videos/{id}/related"]["get"]["responses"][200]["content"]["application/json"];
+
+// ─── Social (Fase 06) ───────────────────────────────────────────────────────────
+export type ReactionSummary =
+  paths["/videos/{id}/reactions"]["get"]["responses"][200]["content"]["application/json"];
+export type SetReactionDto =
+  paths["/videos/{id}/reaction"]["put"]["requestBody"]["content"]["application/json"];
+export type ReactionType = SetReactionDto["type"];
+export type CommentItem =
+  paths["/comments/{id}/replies"]["post"]["responses"][201]["content"]["application/json"];
+export type PaginatedComments =
+  paths["/videos/{id}/comments"]["get"]["responses"][200]["content"]["application/json"];
+export type CreateCommentDto =
+  paths["/videos/{id}/comments"]["post"]["requestBody"]["content"]["application/json"];
+export type SubscriptionState =
+  paths["/channels/{id}/subscription"]["get"]["responses"][200]["content"]["application/json"];
+export type FollowedChannel =
+  paths["/me/subscriptions"]["get"]["responses"][200]["content"]["application/json"][number];
+export type VideoSocial =
+  paths["/social/videos/{id}"]["get"]["responses"][200]["content"]["application/json"];
+export type VideoSocialStats =
+  paths["/social/videos"]["get"]["responses"][200]["content"]["application/json"][number];

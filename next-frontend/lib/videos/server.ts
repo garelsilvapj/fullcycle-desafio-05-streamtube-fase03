@@ -10,6 +10,11 @@ import type {
   PublicChannelVideos,
   RelatedVideos,
   Video,
+  VideoSocial,
+  VideoSocialStats,
+  FollowedChannel,
+  PaginatedComments,
+  SubscriptionState,
 } from "@/lib/api/contracts";
 import { upstream } from "@/lib/api/upstream";
 
@@ -95,4 +100,51 @@ export async function listRelatedVideos(id: string, limit = 8): Promise<RelatedV
   });
   if (error || !data) throw new Error(`Falha ao listar sugestões (${response.status})`);
   return data;
+}
+
+// ─── Social (Fase 06) ───────────────────────────────────────────────────────────
+
+export async function getVideoSocial(id: string): Promise<VideoSocial | null> {
+  const { data, response } = await withOptionalAuth((auth) =>
+    upstream.GET("/social/videos/{id}", { params: { path: { id } }, headers: auth }),
+  );
+  if (response.status === 404) return null;
+  if (!data) throw new Error(`Falha ao carregar dados sociais (${response.status})`);
+  return data;
+}
+
+export async function listComments(videoId: string, page = 1, limit = 20): Promise<PaginatedComments> {
+  const { data, response } = await withOptionalAuth((auth) =>
+    upstream.GET("/videos/{id}/comments", {
+      params: { path: { id: videoId }, query: { page, limit } },
+      headers: auth,
+    }),
+  );
+  if (!data) throw new Error(`Falha ao listar comentários (${response.status})`);
+  return data;
+}
+
+export async function getSubscriptionState(channelId: string): Promise<SubscriptionState> {
+  const { data, response } = await withOptionalAuth((auth) =>
+    upstream.GET("/channels/{id}/subscription", { params: { path: { id: channelId } }, headers: auth }),
+  );
+  if (!data) throw new Error(`Falha ao carregar inscrição (${response.status})`);
+  return data;
+}
+
+export async function listMySubscriptions(): Promise<FollowedChannel[] | null> {
+  const result = await withAuth((auth) => upstream.GET("/me/subscriptions", { headers: auth }));
+  if (!result) return null;
+  if (!result.data) throw new Error(`Falha ao listar inscrições (${result.response.status})`);
+  return result.data;
+}
+
+/** Contagens sociais para o painel (uma chamada para até 50 vídeos). */
+export async function getSocialStats(videoIds: string[]): Promise<Map<string, VideoSocialStats>> {
+  if (videoIds.length === 0) return new Map();
+  const result = await withAuth((auth) =>
+    upstream.GET("/social/videos", { headers: auth, params: { query: { ids: videoIds.join(",") } } }),
+  );
+  if (!result || !result.data) return new Map();
+  return new Map(result.data.map((s) => [s.videoId, s]));
 }
