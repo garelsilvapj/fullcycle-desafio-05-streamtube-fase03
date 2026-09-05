@@ -10,6 +10,11 @@ import { CreateVideosTable1780000000000 } from './migrations/1780000000000-Creat
 import { AddVideoSlug1781000000000 } from './migrations/1781000000000-AddVideoSlug';
 import { CreateCategories1782000000000 } from './migrations/1782000000000-CreateCategories';
 import { AddVideoManagementColumns1783000000000 } from './migrations/1783000000000-AddVideoManagementColumns';
+import { CreateSocialTables1784000000000 } from './migrations/1784000000000-CreateSocialTables';
+import { VideoReaction } from '../reactions/entities/video-reaction.entity';
+import { CommentReaction } from '../reactions/entities/comment-reaction.entity';
+import { Comment } from '../comments/entities/comment.entity';
+import { Subscription } from '../subscriptions/entities/subscription.entity';
 import { Category } from '../categories/entities/category.entity';
 import { createTestDataSource } from '../test/create-test-data-source';
 
@@ -20,6 +25,7 @@ const ALL_MIGRATIONS = [
   AddVideoSlug1781000000000,
   CreateCategories1782000000000,
   AddVideoManagementColumns1783000000000,
+  CreateSocialTables1784000000000,
 ];
 
 const MANAGED_TABLES = [
@@ -29,6 +35,10 @@ const MANAGED_TABLES = [
   'verification_tokens',
   'videos',
   'categories',
+  'video_reactions',
+  'comments',
+  'comment_reactions',
+  'subscriptions',
 ];
 
 // Tipos criados por CREATE TYPE nas migrations; DROP TABLE não os remove.
@@ -36,6 +46,7 @@ const MANAGED_TYPES = [
   'verification_tokens_type_enum',
   'videos_status_enum',
   'videos_visibility_enum',
+  'reaction_type_enum',
 ];
 
 async function listTables(dataSource: DataSource): Promise<string[]> {
@@ -66,7 +77,18 @@ describe('Database migrations (integration)', () => {
 
   beforeAll(async () => {
     dataSource = createTestDataSource(
-      [User, Channel, RefreshToken, VerificationToken, Video, Category],
+      [
+        User,
+        Channel,
+        RefreshToken,
+        VerificationToken,
+        Video,
+        Category,
+        VideoReaction,
+        CommentReaction,
+        Comment,
+        Subscription,
+      ],
       { synchronize: false, migrations: ALL_MIGRATIONS },
     );
     await dataSource.initialize();
@@ -95,9 +117,13 @@ describe('Database migrations (integration)', () => {
     expect(await listTables(dataSource)).toEqual([
       'categories',
       'channels',
+      'comment_reactions',
+      'comments',
       'refresh_tokens',
+      'subscriptions',
       'users',
       'verification_tokens',
+      'video_reactions',
       'videos',
     ]);
     expect(await hasColumn(dataSource, 'videos', 'slug')).toBe(true);
@@ -113,7 +139,10 @@ describe('Database migrations (integration)', () => {
     expect(ranMigrations).toHaveLength(0);
   });
 
-  it('should revert the management, categories, slug and videos migrations in order', async () => {
+  it('should revert the social, management, categories, slug and videos migrations in order', async () => {
+    await dataSource.undoLastMigration();
+    expect(await listTables(dataSource)).not.toContain('comments');
+
     await dataSource.undoLastMigration();
     expect(await hasColumn(dataSource, 'videos', 'published_at')).toBe(false);
 
