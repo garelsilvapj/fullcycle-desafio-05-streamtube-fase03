@@ -118,3 +118,7 @@ export type PublicChannelVideos =
 
 // Reshape aliases
 export type VideoVisibility = Video["visibility"];
+
+// ─── Watch (Fase 05) ────────────────────────────────────────────────────────────
+export type RelatedVideos =
+  paths["/videos/{id}/related"]["get"]["responses"][200]["content"]["application/json"];

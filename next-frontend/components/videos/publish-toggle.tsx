@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import type { Video } from "@/lib/api/contracts"
 import { readApiError } from "@/lib/videos/errors"
+import { formatDateTimeUtc } from "@/lib/videos/format"
 
 /** Publicar / despublicar. Só vídeos `ready` podem ser publicados (TD-04.2). */
 function PublishToggle({ video }: { video: Video }) {
@@ -28,7 +29,7 @@ function PublishToggle({ video }: { video: Video }) {
     <div data-slot="publish-toggle" data-published={video.isPublished} className="flex flex-col gap-2">
       <p className="text-body-md text-foreground">
         {video.isPublished
-          ? `Publicado em ${new Date(video.publishedAt ?? "").toLocaleString("pt-BR")}`
+          ? `Publicado em ${formatDateTimeUtc(video.publishedAt)}`
           : "Rascunho — ainda não está visível no seu canal."}
       </p>
       {!video.isPublished && !canPublish && (
