@@ -280,3 +280,7 @@ Reutilizar: `DomainException`/filtros (`src/common`), `@CurrentUser`/`@Public`, 
 ## Histórico
 
 - 2026-09-04 — Plano criado; Etapa 0 (verdade do repositório e higiene) aplicada no mesmo commit.
+- 2026-09-04 — Etapas 1–7 executadas e commitadas em `master` (hardening do backend, worker
+  resiliente, integração/e2e, smoke local, CI, fatia frontend, fechamento). Marcos M1 e M2
+  atingidos: Fase 03 completa de ponta a ponta, validada no navegador contra a stack real.
+  Próximo: Fase 04 (Etapa B.9), começando por `/screen-inventory` + `/research phase-04`.

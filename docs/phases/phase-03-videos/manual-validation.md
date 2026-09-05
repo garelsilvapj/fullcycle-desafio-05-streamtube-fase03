@@ -64,9 +64,28 @@ sintético com o FFmpeg do container do worker e valida cada passo (asserções 
 - **Conteúdo inválido:** suba um arquivo que não é vídeo. Esperado: após 5 tentativas com backoff, `status: failed` e `error` preenchido (`ffprobe falhou`), visível só para o dono.
 - **API responsiva durante o processamento:** com um transcode em andamento, `curl -w '%{time_total}' http://localhost:3000/` deve continuar abaixo de 200ms (o processamento é em outro processo).
 
-## 5. Registro de execuções
+## 5. Validação no navegador (frontend + backend reais)
+
+Com o backend no ar (API em `start:dev`) e o frontend em `npm run dev` **sem** `MSW_ENABLED`:
+
+```bash
+cd next-frontend && npx playwright install chromium     # uma vez
+node scripts/browser-validation.mjs                      # do repo root; OUT_DIR=... para screenshots
+```
+
+O script registra e confirma um usuário pela API + Mailpit, faz login pela UI, envia
+`tmp/smoke/sample.mp4` pela tela `/upload` (PUT direto no MinIO a partir do navegador), espera o
+worker (`ready`), abre `/videos/[id]`, verifica que o player carregou metadados e fez seek via
+`206 Partial Content` do BFF, confere a lista e exclui o vídeo pela UI.
+
+Manual equivalente: entrar em http://localhost:3001/login, enviar um vídeo em `/upload`, acompanhar a
+barra e o status, abrir "Assistir", arrastar a barra do player (deve buscar sem baixar tudo), baixar,
+voltar para "Meus vídeos" e excluir.
+
+## 6. Registro de execuções
 
 | Data | Executor | Comando | Resultado |
 |---|---|---|---|
 | 2026-09-04 | Claude (sessão do plano) | `bash scripts/smoke-videos.sh` | 58/59 ✔ — fluxo completo incl. multipart (150MB → `failed` após 5 tentativas com `ffprobe falhou`); a única falha era do próprio script (`grep` ausente no container do MinIO), corrigida |
 | 2026-09-04 | Claude (sessão do plano) | `bash scripts/smoke-videos.sh --skip-multipart` | 46/46 ✔ após `@SkipThrottle()` nas rotas de vídeo (o limite global de 10 req/min derrubava o polling com 429) |
+| 2026-09-04 | Claude (sessão do plano) | `node scripts/browser-validation.mjs` | 12/12 ✔ — Chromium headless contra API + worker + MinIO reais: PUT direto do navegador (CORS ok), `ready` pelo worker, player com `206` e seek, exclusão |

@@ -3,9 +3,11 @@
 Fork da base **`mba-ia-greenfield-project`** (NestJS 11 + TypeORM + PostgreSQL, com as Fases 01–02
 completas: auth JWT, users, channels, mail) com a **Fase 03** implementada por cima.
 
-> **Status (2026-09-04):** backend e worker implementados; a fase ainda **não está fechada**. O que
-> falta (hardening, testes de integração/e2e, validação local, CI completa e a fatia frontend) está
-> detalhado em [`docs/evolution-plan.md`](docs/evolution-plan.md), Etapas 0–7.
+> **Status (2026-09-04):** Fase 03 **fechada** — backend endurecido, worker resiliente, frontend
+> (upload/lista/player), testes em todas as camadas (backend 252 unit+integração e 69 e2e; worker 17;
+> frontend 115 Vitest + 19 Playwright), CI completa e validação funcional local automatizada
+> (`scripts/smoke-videos.sh`, `scripts/browser-validation.mjs`). Histórico e roadmap das Fases 04–07
+> em [`docs/evolution-plan.md`](docs/evolution-plan.md).
 
 ## Estado da entrega (verificado)
 
