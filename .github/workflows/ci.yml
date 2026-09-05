@@ -146,3 +146,10 @@ jobs:
         run: npm run lint
       - name: Testes (Vitest + MSW)
         run: npm test
+      - name: OpenAPI e tipos gerados estão sincronizados com o backend
+        working-directory: .
+        run: |
+          bash scripts/sync-openapi.sh
+          (cd next-frontend && npm run openapi:types)
+          git diff --exit-code -- next-frontend/lib/api/types.gen.ts || {
+            echo "::error::lib/api/types.gen.ts desatualizado — rode scripts/sync-openapi.sh e 'npm run openapi:types' e commite."; exit 1; }

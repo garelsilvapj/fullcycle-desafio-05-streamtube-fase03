@@ -25,7 +25,7 @@ These rules govern the BFF (Backend-for-Frontend) layer: same-origin Route Handl
 3. `docker compose exec next-frontend npx tsc --noEmit` — surfaces every consumer that broke against the new contract.
 4. Commit `next-frontend/openapi.json` AND `next-frontend/lib/api/types.gen.ts` **in the same PR**. Both are committed-by-design.
 
-CI guard: `.github/workflows/openapi-freshness.yml` re-runs steps 1–2 and fails the PR if `git diff --exit-code` shows drift in either file. Merging a stale pair is structurally impossible.
+CI guard: the `frontend` job in `.github/workflows/ci.yml` re-runs steps 1–2 and fails the PR if `git diff --exit-code` shows drift in `types.gen.ts`. Merging a stale pair is structurally impossible.
 
 ## Consumption patterns
 
