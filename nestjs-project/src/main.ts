@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import type { ConfigType } from '@nestjs/config';
 import { ValidationPipe } from '@nestjs/common';
 import { SwaggerModule } from '@nestjs/swagger';
+import helmet from 'helmet';
 import { AppModule } from './app.module';
 import { DomainExceptionFilter } from './common/filters/domain-exception.filter';
 import { ValidationExceptionFilter } from './common/filters/validation-exception.filter';
@@ -12,6 +13,9 @@ import swaggerMetadata from './metadata.js';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+  // Cabeçalhos de segurança; sem CORS por desenho (o navegador só fala com o BFF do Next).
+  app.use(helmet());
+  app.enableShutdownHooks();
   const configService = app.get(ConfigService);
   const port = configService.get<number>('app.port') ?? 3000;
 

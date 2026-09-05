@@ -11,6 +11,7 @@ import { AddVideoSlug1781000000000 } from './migrations/1781000000000-AddVideoSl
 import { CreateCategories1782000000000 } from './migrations/1782000000000-CreateCategories';
 import { AddVideoManagementColumns1783000000000 } from './migrations/1783000000000-AddVideoManagementColumns';
 import { CreateSocialTables1784000000000 } from './migrations/1784000000000-CreateSocialTables';
+import { AddSearchIndexes1785000000000 } from './migrations/1785000000000-AddSearchIndexes';
 import { VideoReaction } from '../reactions/entities/video-reaction.entity';
 import { CommentReaction } from '../reactions/entities/comment-reaction.entity';
 import { Comment } from '../comments/entities/comment.entity';
@@ -26,6 +27,7 @@ const ALL_MIGRATIONS = [
   CreateCategories1782000000000,
   AddVideoManagementColumns1783000000000,
   CreateSocialTables1784000000000,
+  AddSearchIndexes1785000000000,
 ];
 
 const MANAGED_TABLES = [
@@ -139,7 +141,13 @@ describe('Database migrations (integration)', () => {
     expect(ranMigrations).toHaveLength(0);
   });
 
-  it('should revert the social, management, categories, slug and videos migrations in order', async () => {
+  it('should revert the search, social, management, categories, slug and videos migrations in order', async () => {
+    await dataSource.undoLastMigration();
+    const trgm = await dataSource.query<{ indexname: string }[]>(
+      `SELECT indexname FROM pg_indexes WHERE indexname = 'IDX_videos_title_trgm'`,
+    );
+    expect(trgm).toHaveLength(0);
+
     await dataSource.undoLastMigration();
     expect(await listTables(dataSource)).not.toContain('comments');
 
