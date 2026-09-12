@@ -12,6 +12,10 @@ services:
         condition: service_healthy
       mailpit:
         condition: service_started
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
 
   db:
     image: postgres:17
@@ -32,5 +36,82 @@ services:
     ports:
       - "1025:1025"
       - "8025:8025"
+
+  # --- Fase 03: fila de processamento ---
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # --- Fase 03: object storage (S3-compatível) ---
+  minio:
+    image: minio/minio
+    command: server /data --console-address ":9001"
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      - MINIO_ROOT_USER=minioadmin
+      - MINIO_ROOT_PASSWORD=minioadmin
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  createbuckets:
+    image: minio/mc
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set local http://minio:9000 minioadmin minioadmin;
+      mc mb --ignore-existing local/streamtube-videos;
+      exit 0;
+      "
+
+  # --- Fase 03: worker de vídeo (FFmpeg) ---
+  worker:
+    build:
+      context: ../worker
+      dockerfile: Dockerfile
+      target: runtime
+    restart: unless-stopped
+    stop_grace_period: 2m
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      createbuckets:
+        condition: service_completed_successfully
+    environment:
+      - DB_HOST=db
+      - DB_PORT=5432
+      - DB_USERNAME=streamtube
+      - DB_PASSWORD=streamtube
+      - DB_NAME=streamtube
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - S3_ENDPOINT=http://minio:9000
+      - S3_REGION=us-east-1
+      - S3_ACCESS_KEY=minioadmin
+      - S3_SECRET_KEY=minioadmin
+      - S3_BUCKET=streamtube-videos
+      - WORKER_CONCURRENCY=1
+      - WORKER_LOCK_DURATION_MS=300000
+
+volumes:
+  minio_data:
 
 

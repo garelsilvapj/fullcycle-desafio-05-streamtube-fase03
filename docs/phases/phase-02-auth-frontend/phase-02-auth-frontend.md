@@ -951,48 +951,48 @@ SI-02.12.0 — depends on SI-02.0.3, SI-02.0.4 (drift audit)
 
 ## Deliverables
 
-- [ ] SI-02.0.1 — Infra: install batch shadcn primitives (checkbox)
-- [ ] SI-02.0.2 — Tests shadcn batch (checkbox)
-- [ ] SI-02.0.3 — Custom-ui: icon-button.tsx
-- [ ] SI-02.0.4 — Custom-business simple group: back-link + forgot-password-form + login-form + password-strength-meter + signup-form
-- [ ] SI-02.0.5 — Custom-business complex: password-visibility-toggle
-- [ ] SI-02.0.6 — Custom-business complex: terms-checkbox
-- [ ] SI-02.1 — Auth contract aliases em `lib/api/contracts.ts`
-- [ ] SI-02.2 — Módulo de sessão iron-session (`lib/auth/session.ts`)
-- [ ] SI-02.3 — Handlers MSW de auth (`mocks/handlers/auth.ts`)
-- [ ] SI-02.4 — Helper de refresh de token single-flight (`lib/auth/refresh.ts`)
-- [ ] SI-02.5 — BFF Route Handler: POST /api/auth/signup
-- [ ] SI-02.6 — BFF Route Handler: POST /api/auth/login
-- [ ] SI-02.7 — BFF Route Handler: POST /api/auth/logout
-- [ ] SI-02.8 — BFF Route Handler: POST /api/auth/forgot-password
-- [ ] SI-02.9 — Propagação de sessão para Client Components (RSC + Context Provider)
-- [ ] SI-02.10.0 — Drift audit: Tela de cadastro
-- [ ] SI-02.10a — Tela de cadastro (visual shell)
-- [ ] SI-02.10b — Tela de cadastro (lógica & wiring)
-- [ ] SI-02.11.0 — Drift audit: Tela de login
-- [ ] SI-02.11a — Tela de login (visual shell)
-- [ ] SI-02.11b — Tela de login (lógica & wiring)
-- [ ] SI-02.12.0 — Drift audit: Tela de solicitação de recuperação de senha
-- [ ] SI-02.12a — Tela de solicitação de recuperação de senha (visual shell)
-- [ ] SI-02.12b — Tela de solicitação de recuperação de senha (lógica & wiring)
+- [x] SI-02.0.1 — Infra: install batch shadcn primitives (checkbox)
+- [x] SI-02.0.2 — Tests shadcn batch (checkbox)
+- [x] SI-02.0.3 — Custom-ui: icon-button.tsx
+- [x] SI-02.0.4 — Custom-business simple group: back-link + forgot-password-form + login-form + password-strength-meter + signup-form
+- [x] SI-02.0.5 — Custom-business complex: password-visibility-toggle
+- [x] SI-02.0.6 — Custom-business complex: terms-checkbox
+- [x] SI-02.1 — Auth contract aliases em `lib/api/contracts.ts`
+- [x] SI-02.2 — Módulo de sessão iron-session (`lib/auth/session.ts`)
+- [x] SI-02.3 — Handlers MSW de auth (`mocks/handlers/auth.ts`)
+- [x] SI-02.4 — Helper de refresh de token single-flight (`lib/auth/refresh.ts`)
+- [x] SI-02.5 — BFF Route Handler: POST /api/auth/signup
+- [x] SI-02.6 — BFF Route Handler: POST /api/auth/login
+- [x] SI-02.7 — BFF Route Handler: POST /api/auth/logout
+- [x] SI-02.8 — BFF Route Handler: POST /api/auth/forgot-password
+- [x] SI-02.9 — Propagação de sessão para Client Components (RSC + Context Provider)
+- [x] SI-02.10.0 — Drift audit: Tela de cadastro
+- [x] SI-02.10a — Tela de cadastro (visual shell)
+- [x] SI-02.10b — Tela de cadastro (lógica & wiring)
+- [x] SI-02.11.0 — Drift audit: Tela de login
+- [x] SI-02.11a — Tela de login (visual shell)
+- [x] SI-02.11b — Tela de login (lógica & wiring)
+- [x] SI-02.12.0 — Drift audit: Tela de solicitação de recuperação de senha
+- [x] SI-02.12a — Tela de solicitação de recuperação de senha (visual shell)
+- [x] SI-02.12b — Tela de solicitação de recuperação de senha (lógica & wiring)
 
 **Per-screen deliverables:**
 
-- [ ] Screen Tela de cadastro (`/signup`) is routable
-- [ ] Screen Tela de cadastro (`/signup`) renders loading, success, and error states
-- [ ] Screen Tela de cadastro (`/signup`) passes component tests (per testing-guide-next-frontend layers)
-- [ ] Screen Tela de login (`/login`) is routable
-- [ ] Screen Tela de login (`/login`) renders loading, success, and error states
-- [ ] Screen Tela de login (`/login`) passes component tests (per testing-guide-next-frontend layers)
-- [ ] Screen Tela de solicitação de recuperação de senha (`/forgot-password`) is routable
-- [ ] Screen Tela de solicitação de recuperação de senha (`/forgot-password`) renders submit, inline success, and error states
-- [ ] Screen Tela de solicitação de recuperação de senha (`/forgot-password`) passes component tests (per testing-guide-next-frontend layers)
+- [x] Screen Tela de cadastro (`/signup`) is routable
+- [x] Screen Tela de cadastro (`/signup`) renders loading, success, and error states
+- [x] Screen Tela de cadastro (`/signup`) passes component tests (per testing-guide-next-frontend layers)
+- [x] Screen Tela de login (`/login`) is routable
+- [x] Screen Tela de login (`/login`) renders loading, success, and error states
+- [x] Screen Tela de login (`/login`) passes component tests (per testing-guide-next-frontend layers)
+- [x] Screen Tela de solicitação de recuperação de senha (`/forgot-password`) is routable
+- [x] Screen Tela de solicitação de recuperação de senha (`/forgot-password`) renders submit, inline success, and error states
+- [x] Screen Tela de solicitação de recuperação de senha (`/forgot-password`) passes component tests (per testing-guide-next-frontend layers)
 
 **Full test suites:**
 
-- [ ] Frontend unit + integration tests pass (`docker compose exec next-frontend npm test`)
-- [ ] E2E tests pass (`npx playwright test` on the host, with the containerized dev server up and `MSW_ENABLED=true` per `next-frontend/CLAUDE.md`)
-- [ ] Type/compilation check passes (`docker compose exec next-frontend npx tsc --noEmit`)
-- [ ] Lint passes (`docker compose exec next-frontend npm run lint`)
+- [x] Frontend unit + integration tests pass (`docker compose exec next-frontend npm test`)
+- [x] E2E tests pass (`npx playwright test` on the host, with the containerized dev server up and `MSW_ENABLED=true` per `next-frontend/CLAUDE.md`)
+- [x] Type/compilation check passes (`docker compose exec next-frontend npx tsc --noEmit`)
+- [x] Lint passes (`docker compose exec next-frontend npm run lint`)
 
 _Scope note: `nestjs-project` is out of this slice's scope — backend auth is settled in `phase-02-auth`; no backend command is listed here by design._

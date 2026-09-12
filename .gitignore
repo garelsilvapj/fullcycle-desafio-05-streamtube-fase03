@@ -1,2 +1,8 @@
-.history/
-settings.local.json
+node_modules/
+dist/
+coverage/
+.env
+.next/
+playwright-report/
+test-results/
+tmp/
