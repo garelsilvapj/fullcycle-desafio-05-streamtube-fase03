@@ -369,18 +369,64 @@ export class VideosService {
   }
 
   /**
-   * Retorna a chave streamável do vídeo do próprio canal, somente se estiver pronto.
-   * Acesso público/anônimo fica para a fase da página de visualização.
+   * Chave streamável para quem pode ver o vídeo (dono ou publicado — TD-05.2), só se `ready`.
    */
   async readyKey(
-    userId: string,
+    userId: string | null,
     id: string,
   ): Promise<{ video: Video; key: string }> {
-    const video = await this.getOwned(userId, id);
+    const video = await this.getViewable(userId, id);
     if (video.status !== VideoStatus.READY || !video.processed_key) {
       throw new VideoNotReadyException();
     }
     return { video, key: video.processed_key };
+  }
+
+  /** Vídeo público pela URL única (TD-05.1): mesma regra de visibilidade de `getViewable`. */
+  async getViewableBySlug(userId: string | null, slug: string): Promise<Video> {
+    const video = await this.repo.findOne({
+      where: { slug },
+      relations: ['category', 'channel'],
+    });
+    if (!video) throw new VideoNotFoundException();
+    return this.getViewable(userId, video.id);
+  }
+
+  /** Incrementa views_count atomicamente; só para vídeos publicados (TD-05.3). */
+  async registerView(id: string): Promise<void> {
+    const video = await this.getViewable(null, id);
+    await this.repo.increment({ id: video.id }, 'views_count', 1);
+  }
+
+  /** Sugestões: mesma categoria (ou recentes), públicos publicados, excluindo o próprio (TD-05.4). */
+  async listRelated(id: string, limit: number): Promise<Video[]> {
+    const video = await this.getViewable(null, id);
+    const base = {
+      visibility: VideoVisibility.PUBLIC,
+      published_at: Not(IsNull()),
+      status: VideoStatus.READY,
+      id: Not(video.id),
+    };
+    const sameCategory = video.category_id
+      ? await this.repo.find({
+          where: { ...base, category_id: video.category_id },
+          relations: ['category', 'channel'],
+          order: { published_at: 'DESC' },
+          take: limit,
+        })
+      : [];
+    if (sameCategory.length >= limit) return sameCategory;
+    const seen = new Set(sameCategory.map((v) => v.id));
+    const recent = await this.repo.find({
+      where: base,
+      relations: ['category', 'channel'],
+      order: { published_at: 'DESC' },
+      take: limit + seen.size,
+    });
+    return [...sameCategory, ...recent.filter((v) => !seen.has(v.id))].slice(
+      0,
+      limit,
+    );
   }
 
   /** Chave da thumbnail servida (custom ?? gerada) para quem pode ver o vídeo (TD-04.4/04.5). */

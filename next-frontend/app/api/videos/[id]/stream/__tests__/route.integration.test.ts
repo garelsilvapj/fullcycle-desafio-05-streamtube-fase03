@@ -23,8 +23,8 @@ const req = (range?: string) =>
   });
 
 describe("GET /api/videos/:id/stream", () => {
-  it("returns 401 without a session", async () => {
-    expect((await GET(req(), params(VIDEO_FIXTURE_ID))).status).toBe(401);
+  it("is public (Fase 05): serves a published video without a session", async () => {
+    expect((await GET(req(), params(VIDEO_FIXTURE_ID))).status).toBe(200);
   });
 
   it("streams the whole file with content headers when there is no Range", async () => {

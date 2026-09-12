@@ -76,6 +76,13 @@ export default async function VideoPage({ params }: { params: Promise<{ id: stri
             Editar no Studio
           </Link>
         </Button>
+        {video.isPublished && (
+          <Button asChild variant="ghost" size="sm">
+            <Link href={`/watch/${video.slug}`} data-slot="watch-link">
+              Ver como público
+            </Link>
+          </Button>
+        )}
         {video.status !== "processing" && <DeleteVideoButton videoId={video.id} />}
       </div>
     </article>

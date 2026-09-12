@@ -217,6 +217,17 @@ Telas e BFF (`next-frontend`, fatia `phase-03-videos-frontend`):
 
 Telas: `/studio` (painel), `/studio/videos/[id]` (editar/publicar/thumbnail), `/studio/channel` (canal) e `/c/[nickname]` (página pública, sem login). Decisões em `docs/decisions/technical-decisions-phase-04-management.md`.
 
+### Visualização pública (Fase 05)
+
+| Método & Rota | Descrição |
+|---------------|-----------|
+| `GET /videos/slug/:slug` | Vídeo publicado pela URL única (público; o dono vê rascunhos com Bearer) |
+| `GET /videos/:id/stream` · `/download` · `/thumbnail` | Públicos para vídeos publicados (`public` ou `unlisted`) |
+| `POST /videos/:id/views` | Registra uma visualização (o player chama no primeiro `play`) |
+| `GET /videos/:id/related?limit` | Sugestões da mesma categoria (fallback: recentes) |
+
+Tela: `/watch/[slug]` (anônimo) com player, informações, descrição expansível, download, link do canal e sidebar de sugestões. Decisões em `docs/decisions/technical-decisions-phase-05-watch.md`.
+
 ## 🛠️ Estrutura do Projeto
 
 ```
@@ -270,7 +281,7 @@ green-field-ia-project/
 | **02** | Cadastro, Login e Gerenciamento de Conta | ✅ Concluída |
 | **03** | Upload e Processamento de Vídeos | ✅ Concluída (backend, worker, frontend, testes, CI) — histórico em [`docs/evolution-plan.md`](docs/evolution-plan.md) |
 | **04** | Gerenciamento de Vídeos e Canal | ✅ Concluída (categorias, edição, publicação, thumbnail própria, Studio, canal público) — pendente alinhamento visual com o Figma |
-| **05** | Página de Visualização do Vídeo | ⏳ Planejada |
+| **05** | Página de Visualização do Vídeo | ✅ Concluída (`/watch/[slug]` público, views, sugestões, download, unlisted por link) — pendente alinhamento visual com o Figma |
 | **06** | Interações Sociais (Likes, Comentários, Inscrições) | ⏳ Planejada |
 | **07** | Página Inicial, Busca e Finalização | ⏳ Planejada |
 

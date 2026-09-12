@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { unauthorized, upstreamError, withAuth } from "@/lib/api/authorized";
+import { upstreamError, withOptionalAuth } from "@/lib/api/authorized";
 import { upstream } from "@/lib/api/upstream";
 
 type Params = { params: Promise<{ id: string }> };
@@ -11,7 +11,7 @@ type Params = { params: Promise<{ id: string }> };
  */
 export async function GET(_request: Request, { params }: Params) {
   const { id } = await params;
-  const result = await withAuth((auth) =>
+  const result = await withOptionalAuth((auth) =>
     upstream.GET("/videos/{id}/download", {
       params: { path: { id } },
       headers: auth,
@@ -19,7 +19,6 @@ export async function GET(_request: Request, { params }: Params) {
       parseAs: "text",
     }),
   );
-  if (!result) return unauthorized();
 
   const { error, response } = result;
   const location = response.headers.get("location");
