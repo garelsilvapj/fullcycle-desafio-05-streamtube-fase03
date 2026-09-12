@@ -8,11 +8,12 @@ More info in the project overview: [docs/project-plan.md](docs/project-plan.md)
 
 ## Repository Structure
 
-This is a monorepo with two main areas:
+This is a monorepo with four main areas:
 
-- `nestjs-project/` — Backend API (NestJS 11, TypeScript, Express). Contains modules for users, channels, videos, comments, etc.
-- `docs/` — Project documentation, architecture diagrams, and planning.
-- `next-frontend/` (Next.js) — not yet initialized
+- `nestjs-project/` — Backend API (NestJS 11, TypeScript, Express). Modules: `auth/`, `users/`, `channels/`, `mail/`, `videos/`, `storage/`, `queue/`, `categories/`, `comments/`, `reactions/`, `subscriptions/`, `social/`, `discovery/`.
+- `worker/` — Video worker (Node + FFmpeg, standalone TypeScript project). Consumes the `video-processing` queue; has its own Dockerfile, Vitest suite and Compose service.
+- `next-frontend/` — Frontend (Next.js App Router) with a BFF layer under `app/api/`. See `next-frontend/CLAUDE.md`.
+- `docs/` — Project documentation, architecture diagrams, decisions and phase planning.
 
 ## Architecture (C4 Container Diagram)
 
@@ -30,11 +31,13 @@ See `docs/diagrams/software-arch.mermaid` for the full diagram. Key containers:
 
 Ciclo completo de upload e processamento de vídeos. Ver
 `docs/phases/phase-03-videos/phase-03-videos.md` e
-`docs/decisions/technical-decisions-phase-03-videos.md`.
+`docs/decisions/technical-decisions-phase-03-videos.md`. A fatia de frontend da fase (upload,
+meus vídeos, player) está em `docs/phases/phase-03-videos-frontend/` e
+`docs/decisions/technical-decisions-phase-03-videos-frontend.md`.
 
-- **Storage**: MinIO/S3 via `src/storage/StorageService` (presigned upload/download, range reads).
+- **Storage**: MinIO/S3 via `src/storage/storage.service.ts` (`StorageService`: presigned upload/download, range reads).
   Upload direto ao storage por URL pré-assinada (não passa 10GB pela API).
-- **Fila**: BullMQ/Redis — `src/queue/VideoQueueService.enqueue(videoId)` (idempotente, `jobId=videoId`).
+- **Fila**: BullMQ/Redis — `src/queue/video-queue.service.ts` (`VideoQueueService.enqueue(videoId)`, idempotente por `jobId=videoId`).
 - **Worker**: `worker/` (processo separado com FFmpeg) consome `video-processing`, gera thumbnail +
   MP4 H.264/AAC, atualiza o vídeo (`processing → ready|failed`).
 - **Estados**: `uploading → uploaded → processing → ready | failed` (`src/videos/entities/video.entity.ts`).
