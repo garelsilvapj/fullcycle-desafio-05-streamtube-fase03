@@ -11,8 +11,9 @@ export const dynamic = "force-dynamic";
 
 export default async function MyVideosPage() {
   await requireSession();
-  const videos = await listMyVideos();
-  if (!videos) redirect("/login");
+  const page = await listMyVideos({ limit: 50 });
+  if (!page) redirect("/login");
+  const videos = page.items;
 
   return (
     <section className="flex flex-col gap-6">

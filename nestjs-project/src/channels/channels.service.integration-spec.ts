@@ -8,6 +8,10 @@ import {
 import { User } from '../users/entities/user.entity';
 import { ChannelsService } from './channels.service';
 import { Channel } from './entities/channel.entity';
+import {
+  ChannelNotFoundException,
+  NicknameTakenException,
+} from './channel.exceptions';
 
 const ALL_ENTITIES = [User, Channel, RefreshToken, VerificationToken];
 
@@ -87,6 +91,66 @@ describe('ChannelsService (integration)', () => {
 
       const channels = await channelRepository.find();
       expect(channels).toHaveLength(2);
+    });
+  });
+
+  describe('getMine / updateMine / getByNickname (Fase 04)', () => {
+    it('updates name, nickname and description of the own channel', async () => {
+      const user = await createUser();
+      await channelsService.createChannel(user.id, user.email);
+
+      const updated = await channelsService.updateMine(user.id, {
+        name: 'Canal da Alice',
+        nickname: 'alice_videos',
+        description: 'Sobre o canal',
+      });
+      expect(updated).toMatchObject({
+        name: 'Canal da Alice',
+        nickname: 'alice_videos',
+        description: 'Sobre o canal',
+      });
+      expect((await channelsService.getMine(user.id)).nickname).toBe(
+        'alice_videos',
+      );
+      expect((await channelsService.getByNickname('alice_videos')).id).toBe(
+        updated.id,
+      );
+    });
+
+    it('rejects a nickname already used by another channel', async () => {
+      const a = await createUser();
+      const b = await createUser();
+      await channelsService.createChannel(a.id, 'taken@example.com');
+      await channelsService.createChannel(b.id, b.email);
+      await expect(
+        channelsService.updateMine(b.id, { nickname: 'taken' }),
+      ).rejects.toBeInstanceOf(NicknameTakenException);
+    });
+
+    it('throws CHANNEL_NOT_FOUND for users without channel and unknown nicknames', async () => {
+      const user = await createUser();
+      await expect(channelsService.getMine(user.id)).rejects.toBeInstanceOf(
+        ChannelNotFoundException,
+      );
+      await expect(
+        channelsService.getByNickname('ghost_channel'),
+      ).rejects.toBeInstanceOf(ChannelNotFoundException);
+    });
+
+    it('countPublishedVideos counts only public, published, ready videos', async () => {
+      const user = await createUser();
+      const channel = await channelsService.createChannel(user.id, user.email);
+      const insert = (slug: string, extra: string) =>
+        dataSource.query(
+          `INSERT INTO "videos" ("channel_id","slug","title","original_key","status","visibility","published_at")
+           VALUES ($1,$2,'t','k',${extra})`,
+          [channel.id, slug],
+        );
+      await insert('slug0000001', `'ready','public',now()`);
+      await insert('slug0000002', `'ready','unlisted',now()`);
+      await insert('slug0000003', `'ready','public',NULL`);
+      await insert('slug0000004', `'processing','public',now()`);
+      expect(await channelsService.countPublishedVideos(channel.id)).toBe(1);
     });
   });
 });

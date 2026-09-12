@@ -9,7 +9,13 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 import { Channel } from '../../channels/entities/channel.entity';
+import { Category } from '../../categories/entities/category.entity';
 import { VIDEO_SLUG_LENGTH, VIDEO_TITLE_MAX_LENGTH } from '../videos.constants';
+
+export enum VideoVisibility {
+  PUBLIC = 'public',
+  UNLISTED = 'unlisted',
+}
 
 export enum VideoStatus {
   UPLOADING = 'uploading',
@@ -61,6 +67,30 @@ export class Video {
   @Column({ type: 'text', nullable: true })
   error: string | null;
 
+  // --- Fase 04: gerenciamento ---
+  @Index()
+  @Column({ type: 'uuid', nullable: true })
+  category_id: string | null;
+
+  @Column({
+    type: 'enum',
+    enum: VideoVisibility,
+    default: VideoVisibility.PUBLIC,
+  })
+  visibility: VideoVisibility;
+
+  /** null = rascunho. Só vídeos `ready` podem ser publicados (TD-04.2). */
+  @Index()
+  @Column({ type: 'timestamptz', nullable: true })
+  published_at: Date | null;
+
+  /** Thumbnail enviada pelo dono; quando presente prevalece sobre a gerada pelo worker. */
+  @Column({ type: 'varchar', nullable: true })
+  custom_thumbnail_key: string | null;
+
+  @Column({ type: 'int', default: 0 })
+  views_count: number;
+
   @CreateDateColumn()
   created_at: Date;
 
@@ -70,4 +100,8 @@ export class Video {
   @ManyToOne(() => Channel)
   @JoinColumn({ name: 'channel_id' })
   channel?: Channel;
+
+  @ManyToOne(() => Category, { nullable: true })
+  @JoinColumn({ name: 'category_id' })
+  category?: Category | null;
 }

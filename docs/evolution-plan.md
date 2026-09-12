@@ -284,3 +284,6 @@ Reutilizar: `DomainException`/filtros (`src/common`), `@CurrentUser`/`@Public`, 
   resiliente, integração/e2e, smoke local, CI, fatia frontend, fechamento). Marcos M1 e M2
   atingidos: Fase 03 completa de ponta a ponta, validada no navegador contra a stack real.
   Próximo: Fase 04 (Etapa B.9), começando por `/screen-inventory` + `/research phase-04`.
+- 2026-09-04 — Fase 04 implementada (backend + frontend) sem inventário do Figma (MCP indisponível):
+  decisões em `docs/decisions/technical-decisions-phase-04-management.md`, plano/progresso em
+  `docs/phases/phase-04-management/`. Próximo: Fase 05 (página de visualização pública).

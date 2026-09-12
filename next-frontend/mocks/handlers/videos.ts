@@ -13,6 +13,7 @@ import {
 type RegisterOk = paths["/videos"]["post"]["responses"][201]["content"]["application/json"];
 type VideoOk = paths["/videos/{id}"]["get"]["responses"][200]["content"]["application/json"];
 type ListOk = paths["/videos"]["get"]["responses"][200]["content"]["application/json"];
+type ThumbPlanOk = paths["/videos/{id}/thumbnail"]["post"]["responses"][200]["content"]["application/json"];
 
 // Reserved trigger table (shared with E2E — values must not collide across suites).
 export const MISSING_VIDEO_ID = "00000000-0000-4000-8000-000000000404";
@@ -59,8 +60,110 @@ function videoById(id: string): Lookup {
 }
 
 export const handlers = [
-  // GET /videos
-  http.get(`${env.API_URL}/videos`, () => HttpResponse.json<ListOk>(buildVideoList())),
+  // GET /videos — painel paginado (page/limit/status/published)
+  http.get(`${env.API_URL}/videos`, ({ request }) => {
+    const url = new URL(request.url);
+    const page = Number(url.searchParams.get("page") ?? 1);
+    const limit = Number(url.searchParams.get("limit") ?? 20);
+    const status = url.searchParams.get("status");
+    const published = url.searchParams.get("published");
+    let items = buildVideoList();
+    if (status) items = items.filter((v) => v.status === status);
+    if (published === "true") items = items.filter((v) => v.isPublished);
+    if (published === "false") items = items.filter((v) => !v.isPublished);
+    const total = items.length;
+    return HttpResponse.json<ListOk>({
+      items: items.slice((page - 1) * limit, page * limit),
+      page,
+      limit,
+      total,
+    });
+  }),
+
+  // PATCH /videos/:id — edição
+  http.patch(`${env.API_URL}/videos/:id`, async ({ params, request }) => {
+    const out = videoById(String(params.id));
+    if ("error" in out) return out.error;
+    const body = (await request.json()) as {
+      title?: string;
+      description?: string | null;
+      visibility?: "public" | "unlisted";
+      categoryId?: string | null;
+    };
+    if (body.title === "") {
+      return HttpResponse.json(errorEnvelope(400, "VALIDATION_ERROR", "title should not be empty"), {
+        status: 400,
+      });
+    }
+    if (body.categoryId === MISSING_VIDEO_ID) {
+      return HttpResponse.json(errorEnvelope(404, "CATEGORY_NOT_FOUND", "Categoria não encontrada"), {
+        status: 404,
+      });
+    }
+    return HttpResponse.json<VideoOk>({
+      ...out.video,
+      title: body.title ?? out.video.title,
+      description: body.description === undefined ? out.video.description : body.description,
+      visibility: body.visibility ?? out.video.visibility,
+      category:
+        body.categoryId === undefined
+          ? out.video.category
+          : body.categoryId === null
+            ? null
+            : { id: body.categoryId, name: "Categoria", slug: "categoria" },
+    });
+  }),
+
+  // POST /videos/:id/publish|unpublish
+  http.post(`${env.API_URL}/videos/:id/publish`, ({ params }) => {
+    const out = videoById(String(params.id));
+    if ("error" in out) return out.error;
+    if (out.video.status !== "ready") {
+      return HttpResponse.json(
+        errorEnvelope(409, "VIDEO_NOT_PUBLISHABLE", "Só vídeos já processados (ready) podem ser publicados"),
+        { status: 409 },
+      );
+    }
+    return HttpResponse.json<VideoOk>({
+      ...out.video,
+      isPublished: true,
+      publishedAt: out.video.publishedAt ?? "2026-09-04T13:00:00.000Z",
+    });
+  }),
+  http.post(`${env.API_URL}/videos/:id/unpublish`, ({ params }) => {
+    const out = videoById(String(params.id));
+    if ("error" in out) return out.error;
+    return HttpResponse.json<VideoOk>({ ...out.video, isPublished: false, publishedAt: null });
+  }),
+
+  // Thumbnail própria: plano, confirmação e remoção
+  http.post(`${env.API_URL}/videos/:id/thumbnail`, async ({ params, request }) => {
+    const out = videoById(String(params.id));
+    if ("error" in out) return out.error;
+    const body = (await request.json()) as { contentType?: string };
+    if (!["image/jpeg", "image/png", "image/webp"].includes(body.contentType ?? "")) {
+      return HttpResponse.json(errorEnvelope(400, "VALIDATION_ERROR", "contentType must be one of the following values"), {
+        status: 400,
+      });
+    }
+    return HttpResponse.json<ThumbPlanOk>({
+      url: `http://localhost:9000/streamtube-videos/put/${String(params.id)}/thumb-custom`,
+    });
+  }),
+  http.post(`${env.API_URL}/videos/:id/thumbnail/confirm`, ({ params }) => {
+    const out = videoById(String(params.id));
+    if ("error" in out) return out.error;
+    return HttpResponse.json<VideoOk>({
+      ...out.video,
+      hasCustomThumbnail: true,
+      thumbnailUrl: `/videos/${String(params.id)}/thumbnail`,
+    });
+  }),
+  http.delete(`${env.API_URL}/videos/:id/thumbnail`, ({ params }) => {
+    const out = videoById(String(params.id));
+    if ("error" in out) return out.error;
+    return HttpResponse.json<VideoOk>({ ...out.video, hasCustomThumbnail: false });
+  }),
 
   // POST /videos
   http.post(`${env.API_URL}/videos`, async ({ request }) => {

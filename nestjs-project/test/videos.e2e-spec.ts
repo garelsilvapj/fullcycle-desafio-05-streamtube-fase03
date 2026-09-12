@@ -428,8 +428,12 @@ describe('Videos (e2e)', () => {
         .get('/videos')
         .set('Authorization', `Bearer ${owner}`)
         .expect(200);
-      const list = body<VideoBody[]>(res);
-      expect(list.map((v) => v.id)).toEqual([second.video.id, first.video.id]);
+      const list = body<{ items: VideoBody[]; total: number }>(res);
+      expect(list.items.map((v) => v.id)).toEqual([
+        second.video.id,
+        first.video.id,
+      ]);
+      expect(list.total).toBe(2);
     });
   });
 

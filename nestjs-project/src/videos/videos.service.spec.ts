@@ -3,19 +3,23 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { QueryFailedError } from 'typeorm';
 
 import { VideosService } from './videos.service';
-import { Video, VideoStatus } from './entities/video.entity';
+import { Video, VideoStatus, VideoVisibility } from './entities/video.entity';
 import { Channel } from '../channels/entities/channel.entity';
 import { StorageService } from '../storage/storage.service';
 import { VideoQueueService } from '../queue/video-queue.service';
+import { CategoriesService } from '../categories/categories.service';
 import { VIDEO_SLUG_PATTERN } from './slug.util';
 import {
   ChannelNotFoundException,
   VideoChannelForbiddenException,
   VideoInvalidStateException,
   VideoNotFoundException,
+  VideoNotPublishableException,
   VideoNotReadyException,
+  VideoThumbnailInvalidException,
   VideoUploadNotConfirmedException,
 } from './video.exceptions';
+import { CategoryNotFoundException } from '../categories/category.exceptions';
 
 function slugCollision(): QueryFailedError {
   const err = new QueryFailedError('INSERT', [], new Error('dup'));
@@ -34,6 +38,9 @@ describe('VideosService', () => {
     remove: jest.fn((v: Video) => Promise.resolve(v)),
     findOne: jest.fn(),
     find: jest.fn(() => Promise.resolve([])),
+    findAndCount: jest.fn(
+      (): Promise<[Video[], number]> => Promise.resolve([[], 0]),
+    ),
   };
   const channelRepo = { findOne: jest.fn() };
   const storage = {
@@ -60,6 +67,7 @@ describe('VideosService', () => {
     deleteObjects: jest.fn(() => Promise.resolve(undefined)),
   };
   const queue = { enqueue: jest.fn() };
+  const categories = { getById: jest.fn() };
 
   const CH = { id: 'ch-1', user_id: 'user-1' } as Channel;
   const owned = (extra: Partial<Video>): Video =>
@@ -84,6 +92,7 @@ describe('VideosService', () => {
         { provide: getRepositoryToken(Channel), useValue: channelRepo },
         { provide: StorageService, useValue: storage },
         { provide: VideoQueueService, useValue: queue },
+        { provide: CategoriesService, useValue: categories },
       ],
     }).compile();
     service = moduleRef.get(VideosService);
@@ -323,13 +332,39 @@ describe('VideosService', () => {
   });
 
   describe('listMine', () => {
-    it('lista pelo canal do usuário, mais recentes primeiro', async () => {
+    it('lista pelo canal do usuário, paginado, mais recentes primeiro', async () => {
       channelRepo.findOne.mockResolvedValue(CH);
-      await service.listMine('user-1');
-      expect(videoRepo.find).toHaveBeenCalledWith({
-        where: { channel_id: 'ch-1' },
-        order: { created_at: 'DESC' },
+      videoRepo.findAndCount.mockResolvedValueOnce([[owned({})], 7]);
+      const page = await service.listMine('user-1', { page: 2, limit: 5 });
+      expect(videoRepo.findAndCount).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { channel_id: 'ch-1' },
+          relations: ['category'],
+          order: { created_at: 'DESC' },
+          skip: 5,
+          take: 5,
+        }),
+      );
+      expect(page).toMatchObject({ page: 2, limit: 5, total: 7 });
+      expect(page.items).toHaveLength(1);
+    });
+
+    it('aplica filtros de status e publicação', async () => {
+      channelRepo.findOne.mockResolvedValue(CH);
+      await service.listMine('user-1', {
+        page: 1,
+        limit: 20,
+        status: VideoStatus.READY,
+        published: false,
       });
+      const [args] = videoRepo.findAndCount.mock.calls[0] as unknown as [
+        { where: Record<string, unknown> },
+      ];
+      expect(args.where).toMatchObject({
+        channel_id: 'ch-1',
+        status: VideoStatus.READY,
+      });
+      expect(args.where.published_at).toBeDefined();
     });
   });
 
@@ -380,6 +415,150 @@ describe('VideosService', () => {
       await expect(service.thumbnailKey('user-1', 'v-1')).resolves.toBe(
         't.jpg',
       );
+    });
+  });
+
+  describe('update / publish (Fase 04)', () => {
+    it('update altera título, descrição, visibilidade e categoria (validando a categoria)', async () => {
+      channelRepo.findOne.mockResolvedValue(CH);
+      const video = owned({});
+      videoRepo.findOne.mockResolvedValue(video);
+      categories.getById.mockResolvedValue({
+        id: 'cat-1',
+        name: 'Games',
+        slug: 'games',
+      });
+
+      await service.update('user-1', 'v-1', {
+        title: 'Novo',
+        description: null,
+        visibility: VideoVisibility.UNLISTED,
+        categoryId: 'cat-1',
+      });
+      expect(videoRepo.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          title: 'Novo',
+          description: null,
+          visibility: VideoVisibility.UNLISTED,
+          category_id: 'cat-1',
+        }),
+      );
+    });
+
+    it('update com categoria inexistente propaga CATEGORY_NOT_FOUND sem salvar', async () => {
+      channelRepo.findOne.mockResolvedValue(CH);
+      videoRepo.findOne.mockResolvedValue(owned({}));
+      categories.getById.mockRejectedValueOnce(new CategoryNotFoundException());
+      await expect(
+        service.update('user-1', 'v-1', { categoryId: 'nope' }),
+      ).rejects.toBeInstanceOf(CategoryNotFoundException);
+      expect(videoRepo.save).not.toHaveBeenCalled();
+    });
+
+    it('publish exige ready, é idempotente e unpublish limpa a data', async () => {
+      channelRepo.findOne.mockResolvedValue(CH);
+      videoRepo.findOne.mockResolvedValue(
+        owned({ status: VideoStatus.PROCESSING }),
+      );
+      await expect(service.publish('user-1', 'v-1')).rejects.toBeInstanceOf(
+        VideoNotPublishableException,
+      );
+
+      const ready = owned({ status: VideoStatus.READY, published_at: null });
+      videoRepo.findOne.mockResolvedValue(ready);
+      const first = await service.publish('user-1', 'v-1');
+      expect(first.published_at).toBeInstanceOf(Date);
+      const stamp = first.published_at;
+      videoRepo.save.mockClear();
+      await service.publish('user-1', 'v-1');
+      expect(videoRepo.save).not.toHaveBeenCalled();
+      expect(ready.published_at).toBe(stamp);
+
+      const un = await service.unpublish('user-1', 'v-1');
+      expect(un.published_at).toBeNull();
+    });
+  });
+
+  describe('thumbnail custom (Fase 04)', () => {
+    it('createThumbnailUpload assina um PUT com o content-type na chave thumb-custom', async () => {
+      channelRepo.findOne.mockResolvedValue(CH);
+      videoRepo.findOne.mockResolvedValue(owned({}));
+      const out = await service.createThumbnailUpload(
+        'user-1',
+        'v-1',
+        'image/png',
+      );
+      expect(storage.createPresignedUpload).toHaveBeenCalledWith(
+        'videos/ch-1/v-1/thumb-custom',
+        'image/png',
+      );
+      expect(out.url).toBe('https://minio/presigned');
+    });
+
+    it('confirmThumbnail exige o objeto e rejeita (e apaga) imagens acima de 5MB', async () => {
+      channelRepo.findOne.mockResolvedValue(CH);
+      videoRepo.findOne.mockResolvedValue(owned({}));
+      storage.head.mockResolvedValueOnce(null);
+      await expect(
+        service.confirmThumbnail('user-1', 'v-1'),
+      ).rejects.toBeInstanceOf(VideoThumbnailInvalidException);
+
+      storage.head.mockResolvedValueOnce({ size: 6 * 1024 * 1024 });
+      await expect(
+        service.confirmThumbnail('user-1', 'v-1'),
+      ).rejects.toBeInstanceOf(VideoThumbnailInvalidException);
+      expect(storage.deleteObjects).toHaveBeenCalledWith([
+        'videos/ch-1/v-1/thumb-custom',
+      ]);
+
+      storage.head.mockResolvedValueOnce({ size: 1024 });
+      const v = await service.confirmThumbnail('user-1', 'v-1');
+      expect(v.custom_thumbnail_key).toBe('videos/ch-1/v-1/thumb-custom');
+    });
+
+    it('removeCustomThumbnail apaga o objeto e volta à gerada', async () => {
+      channelRepo.findOne.mockResolvedValue(CH);
+      videoRepo.findOne.mockResolvedValue(
+        owned({
+          custom_thumbnail_key: 'videos/ch-1/v-1/thumb-custom',
+          thumbnail_key: 'gen',
+        }),
+      );
+      const v = await service.removeCustomThumbnail('user-1', 'v-1');
+      expect(storage.deleteObjects).toHaveBeenCalledWith([
+        'videos/ch-1/v-1/thumb-custom',
+      ]);
+      expect(v.custom_thumbnail_key).toBeNull();
+    });
+
+    it('thumbnailKey prefere a custom, é pública para publicados e 404 para rascunho de terceiros', async () => {
+      const published = owned({
+        status: VideoStatus.READY,
+        published_at: new Date(),
+        thumbnail_key: 'gen',
+        custom_thumbnail_key: 'custom',
+      });
+      videoRepo.findOne.mockResolvedValue(published);
+      await expect(service.thumbnailKey(null, 'v-1')).resolves.toBe('custom');
+
+      const draft = owned({
+        status: VideoStatus.READY,
+        published_at: null,
+        thumbnail_key: 'gen',
+      });
+      videoRepo.findOne.mockResolvedValue(draft);
+      channelRepo.findOne.mockResolvedValue({
+        id: 'ch-OUTRO',
+        user_id: 'user-2',
+      } as Channel);
+      await expect(
+        service.thumbnailKey('user-2', 'v-1'),
+      ).rejects.toBeInstanceOf(VideoNotFoundException);
+      await expect(service.thumbnailKey(null, 'v-1')).rejects.toBeInstanceOf(
+        VideoNotFoundException,
+      );
+      channelRepo.findOne.mockResolvedValue(CH);
+      await expect(service.thumbnailKey('user-1', 'v-1')).resolves.toBe('gen');
     });
   });
 });

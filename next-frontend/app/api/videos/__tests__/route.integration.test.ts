@@ -10,7 +10,7 @@ vi.mock("next/headers", async () =>
   (await import("@/lib/api/__tests__/session-test-utils")).cookiesModule(),
 );
 
-let GET: () => Promise<Response>;
+let GET: (req: Request) => Promise<Response>;
 let POST: (req: Request) => Promise<Response>;
 
 beforeAll(async () => {
@@ -35,7 +35,7 @@ describe("GET /api/videos", () => {
         return HttpResponse.json([]);
       }),
     );
-    const res = await GET();
+    const res = await GET(new Request("http://localhost/api/videos"));
     expect(res.status).toBe(401);
     expect(called).toBe(false);
   });
@@ -49,7 +49,7 @@ describe("GET /api/videos", () => {
         return HttpResponse.json([{ id: "v" }]);
       }),
     );
-    const res = await GET();
+    const res = await GET(new Request("http://localhost/api/videos"));
     expect(res.status).toBe(200);
     expect(auth).toBe("Bearer token-abc");
     expect(await res.json()).toEqual([{ id: "v" }]);
@@ -66,7 +66,7 @@ describe("GET /api/videos", () => {
           : HttpResponse.json([]);
       }),
     );
-    const res = await GET();
+    const res = await GET(new Request("http://localhost/api/videos"));
     expect(res.status).toBe(200);
     expect(seen).toEqual(["Bearer expired-token", "Bearer new-fixture-access-token"]);
   });
@@ -81,7 +81,7 @@ describe("GET /api/videos", () => {
         HttpResponse.json({ statusCode: 401, error: "INVALID_TOKEN", message: "x" }, { status: 401 }),
       ),
     );
-    const res = await GET();
+    const res = await GET(new Request("http://localhost/api/videos"));
     expect(res.status).toBe(401);
     expect(sessionCleared()).toBe(true);
   });

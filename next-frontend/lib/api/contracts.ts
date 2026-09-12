@@ -84,3 +84,37 @@ export type UploadPlan = RegisterVideoResponse["upload"];
 export type SingleUploadPlan = Extract<UploadPlan, { type: "single" }>;
 export type MultipartUploadPlan = Extract<UploadPlan, { type: "multipart" }>;
 export type CompletedPart = CompleteMultipartDto["parts"][number];
+
+// ─── Videos management + Channels + Categories (Fase 04) ──────────────────────
+
+export type UpdateVideoDto =
+  paths["/videos/{id}"]["patch"]["requestBody"]["content"]["application/json"];
+
+export type ListVideosQuery = NonNullable<paths["/videos"]["get"]["parameters"]["query"]>;
+
+export type PaginatedVideos =
+  paths["/videos"]["get"]["responses"][200]["content"]["application/json"];
+
+export type CreateThumbnailUploadDto =
+  paths["/videos/{id}/thumbnail"]["post"]["requestBody"]["content"]["application/json"];
+
+export type ThumbnailUploadPlan =
+  paths["/videos/{id}/thumbnail"]["post"]["responses"][200]["content"]["application/json"];
+
+export type Category =
+  paths["/categories"]["get"]["responses"][200]["content"]["application/json"][number];
+
+export type Channel =
+  paths["/channels/me"]["get"]["responses"][200]["content"]["application/json"];
+
+export type UpdateChannelDto =
+  paths["/channels/me"]["patch"]["requestBody"]["content"]["application/json"];
+
+export type PublicChannel =
+  paths["/channels/{nickname}"]["get"]["responses"][200]["content"]["application/json"];
+
+export type PublicChannelVideos =
+  paths["/channels/{nickname}/videos"]["get"]["responses"][200]["content"]["application/json"];
+
+// Reshape aliases
+export type VideoVisibility = Video["visibility"];

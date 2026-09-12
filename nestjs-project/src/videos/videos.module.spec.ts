@@ -10,12 +10,20 @@ import { VerificationToken } from '../auth/entities/verification-token.entity';
 import { Channel } from '../channels/entities/channel.entity';
 import { User } from '../users/entities/user.entity';
 import { createTestDataSource } from '../test/create-test-data-source';
+import { Category } from '../categories/entities/category.entity';
 import { Video } from './entities/video.entity';
 import { VideosModule } from './videos.module';
 import { VideosService } from './videos.service';
 import { VIDEO_QUEUE } from '../queue/video-queue.service';
 
-const ALL_ENTITIES = [User, Channel, RefreshToken, VerificationToken, Video];
+const ALL_ENTITIES = [
+  User,
+  Channel,
+  RefreshToken,
+  VerificationToken,
+  Video,
+  Category,
+];
 
 describe('VideosModule', () => {
   it('compila com TypeOrmModule.forFeature([Video, Channel]), StorageModule e QueueModule', async () => {

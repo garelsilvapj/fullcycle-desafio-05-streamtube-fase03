@@ -89,3 +89,4 @@ voltar para "Meus vídeos" e excluir.
 | 2026-09-04 | Claude (sessão do plano) | `bash scripts/smoke-videos.sh` | 58/59 ✔ — fluxo completo incl. multipart (150MB → `failed` após 5 tentativas com `ffprobe falhou`); a única falha era do próprio script (`grep` ausente no container do MinIO), corrigida |
 | 2026-09-04 | Claude (sessão do plano) | `bash scripts/smoke-videos.sh --skip-multipart` | 46/46 ✔ após `@SkipThrottle()` nas rotas de vídeo (o limite global de 10 req/min derrubava o polling com 429) |
 | 2026-09-04 | Claude (sessão do plano) | `node scripts/browser-validation.mjs` | 12/12 ✔ — Chromium headless contra API + worker + MinIO reais: PUT direto do navegador (CORS ok), `ready` pelo worker, player com `206` e seek, exclusão |
+| 2026-09-05 | Claude (sessão do plano) | `bash scripts/smoke-videos.sh --skip-multipart` | 61/61 ✔ — inclui a seção 8c da Fase 04 (editar, publicar, canal público, thumbnail pública, painel filtrado) |

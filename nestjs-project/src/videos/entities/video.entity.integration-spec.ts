@@ -7,9 +7,17 @@ import {
   cleanAllTables,
   createTestDataSource,
 } from '../../test/create-test-data-source';
+import { Category } from '../../categories/entities/category.entity';
 import { Video, VideoStatus } from './video.entity';
 
-const ALL_ENTITIES = [User, Channel, RefreshToken, VerificationToken, Video];
+const ALL_ENTITIES = [
+  User,
+  Channel,
+  RefreshToken,
+  VerificationToken,
+  Video,
+  Category,
+];
 
 describe('Video entity (integration)', () => {
   let dataSource: DataSource;

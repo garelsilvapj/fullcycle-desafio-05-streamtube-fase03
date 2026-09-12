@@ -59,3 +59,19 @@ export class VideoInvalidStateException extends DomainException {
     );
   }
 }
+
+export class VideoNotPublishableException extends DomainException {
+  constructor() {
+    super(
+      'VIDEO_NOT_PUBLISHABLE',
+      409,
+      'Só vídeos já processados (ready) podem ser publicados',
+    );
+  }
+}
+
+export class VideoThumbnailInvalidException extends DomainException {
+  constructor(reason: string) {
+    super('VIDEO_THUMBNAIL_INVALID', 400, `Thumbnail inválida: ${reason}`);
+  }
+}
