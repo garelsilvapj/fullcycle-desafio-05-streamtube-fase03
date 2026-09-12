@@ -289,3 +289,5 @@ Reutilizar: `DomainException`/filtros (`src/common`), `@CurrentUser`/`@Public`, 
   `docs/phases/phase-04-management/`. Próximo: Fase 05 (página de visualização pública).
 - 2026-09-05 — Fase 05 implementada (`/watch/[slug]`, stream/download públicos, views, sugestões):
   `docs/decisions/technical-decisions-phase-05-watch.md`, `docs/phases/phase-05-watch/`. Próximo: Fase 06.
+- 2026-09-05 — Fase 06 implementada (reações, comentários com resposta, inscrições, agregados sociais):
+  `docs/decisions/technical-decisions-phase-06-social.md`, `docs/phases/phase-06-social/`. Próximo: Fase 07.

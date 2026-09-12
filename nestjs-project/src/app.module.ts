@@ -15,6 +15,12 @@ import { envValidationSchema } from './config/env.validation';
 import { StorageModule } from './storage/storage.module';
 import { QueueModule } from './queue/queue.module';
 import { VideosModule } from './videos/videos.module';
+import { CategoriesModule } from './categories/categories.module';
+import { ChannelsModule } from './channels/channels.module';
+import { ReactionsModule } from './reactions/reactions.module';
+import { CommentsModule } from './comments/comments.module';
+import { SubscriptionsModule } from './subscriptions/subscriptions.module';
+import { SocialModule } from './social/social.module';
 
 @Module({
   imports: [
@@ -49,7 +55,13 @@ import { VideosModule } from './videos/videos.module';
     AuthModule,
     StorageModule,
     QueueModule,
+    CategoriesModule,
+    ChannelsModule,
     VideosModule,
+    ReactionsModule,
+    CommentsModule,
+    SubscriptionsModule,
+    SocialModule,
   ],
   controllers: [AppController],
   providers: [AppService],

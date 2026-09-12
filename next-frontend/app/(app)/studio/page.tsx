@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { AutoRefresh } from "@/components/videos/auto-refresh";
 import { StudioTable } from "@/components/videos/studio-table";
 import { requireSession } from "@/lib/auth/require-session";
-import { getMyChannel, listMyVideos } from "@/lib/videos/server";
+import { getMyChannel, getSocialStats, listMyVideos } from "@/lib/videos/server";
 
 export const metadata = { title: "Studio — StreamTube" };
 export const dynamic = "force-dynamic";
@@ -32,6 +32,7 @@ export default async function StudioPage({ searchParams }: { searchParams: Searc
     getMyChannel(),
   ]);
   if (!data || !channel) redirect("/login");
+  const stats = await getSocialStats(data.items.map((v) => v.id));
 
   const filterHref = (next: { status?: string; published?: string }) => {
     const search = new URLSearchParams();
@@ -80,7 +81,7 @@ export default async function StudioPage({ searchParams }: { searchParams: Searc
         </Button>
       </nav>
 
-      <StudioTable data={data} filters={{ status, published }} />
+      <StudioTable data={data} filters={{ status, published }} stats={stats} />
     </section>
   );
 }
