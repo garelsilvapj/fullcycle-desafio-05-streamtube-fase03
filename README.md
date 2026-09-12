@@ -49,6 +49,23 @@ Todas as fases do [plano do projeto](docs/project-plan.md) estão implementadas,
 
 Histórico completo do fechamento da Fase 03 e da evolução até a Fase 07, com o processo de engenharia adotado (decisões → plano → implementação → testes → validação local → CI → commit), em [`docs/evolution-plan.md`](docs/evolution-plan.md).
 
+### Fluxo de trabalho (Git Flow)
+
+O repositório segue as convenções de Git Flow declaradas no [`CLAUDE.md`](CLAUDE.md#git-conventions),
+com duas branches de vida longa e uma branch por fase:
+
+| Branch | Papel |
+|--------|-------|
+| `main` | Base estável — corresponde ao fork de [`devfullcycle/mba-ia-greenfield-project`](https://github.com/devfullcycle/mba-ia-greenfield-project) com as Fases 01–02. Nunca recebe commit direto. |
+| `dev` | Branch de integração — recebe cada fase por merge `--no-ff`. |
+| `feature/phase-03-videos` … `feature/phase-07-home` | Uma branch por fase, criada a partir da `dev` e mergeada de volta nela. |
+| `docs/sync-documentation` | Sincronização da documentação com o estado final do código. |
+
+```bash
+git log --graph --oneline dev   # mostra os merges --no-ff, uma fase por branch
+```
+
+
 ---
 
 ## 📋 Pré-requisitos

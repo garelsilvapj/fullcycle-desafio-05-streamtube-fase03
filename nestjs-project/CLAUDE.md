@@ -98,10 +98,10 @@ Integration and e2e suites share a single test database. They **must** be run wi
 ```bash
 docker compose exec nestjs-api npm test -- --runInBand
 docker compose exec nestjs-api npm run test:integration   # already passes --runInBand
-docker compose exec nestjs-api npm run test:e2e -- --runInBand
+docker compose exec nestjs-api npm run test:e2e
 ```
 
-> `test:e2e` does **not** hardcode `--runInBand` yet (tracked in `docs/evolution-plan.md`, Etapa 3). Until it does, pass the flag explicitly as above.
+> Both `test:integration` and `test:e2e` already hardcode `--runInBand` in `package.json`; no extra flag needed.
 
 Parallel execution causes FK violations, deadlocks, and cross-suite contamination because suites truncate or seed shared tables concurrently.
 

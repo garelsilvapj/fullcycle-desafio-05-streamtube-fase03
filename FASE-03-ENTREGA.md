@@ -3,25 +3,32 @@
 Fork da base **`mba-ia-greenfield-project`** (NestJS 11 + TypeORM + PostgreSQL, com as Fases 01–02
 completas: auth JWT, users, channels, mail) com a **Fase 03** implementada por cima.
 
-> **Status (2026-09-04):** Fase 03 **fechada** — backend endurecido, worker resiliente, frontend
-> (upload/lista/player), testes em todas as camadas (backend 252 unit+integração e 69 e2e; worker 17;
-> frontend 115 Vitest + 19 Playwright), CI completa e validação funcional local automatizada
-> (`scripts/smoke-videos.sh`, `scripts/browser-validation.mjs`). Histórico e roadmap das Fases 04–07
-> em [`docs/evolution-plan.md`](docs/evolution-plan.md).
+> **Status:** Fase 03 **fechada** — backend endurecido, worker resiliente, frontend
+> (upload/lista/player), testes em todas as camadas, CI completa e validação funcional local
+> automatizada (`scripts/smoke-videos.sh`, `scripts/browser-validation.mjs`). Histórico e roadmap
+> das Fases 04–07 em [`docs/evolution-plan.md`](docs/evolution-plan.md).
+>
+> Os números abaixo são a medição da suíte **no estado atual do repositório**, que já inclui as
+> Fases 04–07 construídas sobre esta.
 
 ## Estado da entrega (verificado)
 
-- ✅ **`npx tsc --noEmit`** passa limpo (o módulo de vídeos + storage + fila compilam com a base real).
+- ✅ **`npx tsc --noEmit`** sai com código 0 (API e worker).
 - ✅ **`npm run build`** (nest build) passa.
-- ✅ **Lint** (eslint/prettier) limpo nos arquivos da fase.
-- ✅ **Testes** do módulo de vídeos: `npx jest src/videos` → 14/14 passam (10 em `videos.service.spec.ts`, 4 em `videos.controller.spec.ts`).
-- ⚠️ Ainda **sem** testes de integração/e2e de vídeos, storage e fila, e sem testes no worker — ver `docs/evolution-plan.md` Etapas 2–3.
-- ✅ **Worker** (`worker/`) compila (`tsc --noEmit`).
-- Execução real de ponta a ponta requer `docker compose up` (db + redis + minio + worker) — o
-  processamento de vídeo usa FFmpeg (já provisionado na imagem do worker).
-- ⚠️ As URLs pré-assinadas são geradas com `S3_ENDPOINT=http://minio:9000`, alcançável apenas
-  dentro da rede Docker. Para fazer o `PUT` a partir do host/navegador é necessário o
-  `S3_PUBLIC_ENDPOINT` (Etapa 1.1 do plano de evolução) ou mapear `minio` no `/etc/hosts`.
+- ✅ **Lint** (eslint + prettier `--check`) limpo.
+- ✅ **Testes da API:** 283 unit+integração em 42 suítes (`npm test`) e 101 e2e em 9 suítes
+  (`npm run test:e2e`), todos verdes. Os testes de integração e e2e rodam contra a infra real do
+  Compose (Postgres, Redis, MinIO) — storage, fila e worker não são mockados.
+- ✅ **Testes do worker:** 17 (Vitest) — 13 rodam em qualquer ambiente e 4 são de integração com
+  FFmpeg real, executados na imagem `--target test` (pulados quando não há FFmpeg no host).
+- ✅ **Frontend:** 169 testes Vitest em 49 suítes, mais os specs Playwright (a fatia de UI da fase
+  está documentada em `docs/phases/phase-03-videos-frontend/`).
+- ✅ **Presign alcançável pelo cliente:** `S3_PUBLIC_ENDPOINT` assina as URLs entregues ao
+  navegador, enquanto `S3_ENDPOINT` (`http://minio:9000`) é o endpoint interno usado pela API.
+- ✅ **Validação funcional local** automatizada: `scripts/smoke-videos.sh` e
+  `scripts/browser-validation.mjs` (registrar → PUT presigned → confirmar → worker → stream 206).
+- Execução de ponta a ponta requer `docker compose up -d --build` (db, mailpit, redis, minio,
+  createbuckets, worker e api) — o FFmpeg já vem provisionado na imagem do worker.
 
 ## Artefatos de planejamento (contrato da fase)
 
