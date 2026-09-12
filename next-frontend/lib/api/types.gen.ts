@@ -241,6 +241,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/categories": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Listar categorias
+         * @description Categorias fixas da plataforma, em ordem alfabética.
+         */
+        get: operations["CategoriesController_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/videos": {
         parameters: {
             query?: never;
@@ -555,26 +575,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/categories": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Listar categorias
-         * @description Categorias fixas da plataforma, em ordem alfabética.
-         */
-        get: operations["CategoriesController_list"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/videos/{id}/reactions": {
         parameters: {
             query?: never;
@@ -753,6 +753,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/feed": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Feed da home
+         * @description Vídeos públicos publicados, mais recentes primeiro; filtro opcional por categoria (slug).
+         */
+        get: operations["DiscoveryController_feed"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Buscar vídeos
+         * @description Busca por título do vídeo e nome/nickname do canal entre vídeos públicos publicados.
+         */
+        get: operations["DiscoveryController_search"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -787,6 +827,14 @@ export interface components {
              */
             nickname?: string;
             description?: string | null;
+        };
+        CategoryResponseDto: {
+            /** Format: uuid */
+            id: string;
+            /** @example Tecnologia */
+            name: string;
+            /** @example tecnologia */
+            slug: string;
         };
         SingleUploadPlanDto: {
             /** @enum {string} */
@@ -823,14 +871,6 @@ export interface components {
         VideoStatus: "uploading" | "uploaded" | "processing" | "ready" | "failed";
         /** @enum {string} */
         VideoVisibility: "public" | "unlisted";
-        CategoryResponseDto: {
-            /** Format: uuid */
-            id: string;
-            /** @example Tecnologia */
-            name: string;
-            /** @example tecnologia */
-            slug: string;
-        };
         VideoChannelSummaryDto: {
             /** Format: uuid */
             id: string;
@@ -1508,6 +1548,25 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    CategoriesController_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CategoryResponseDto"][];
                 };
             };
         };
@@ -2543,25 +2602,6 @@ export interface operations {
             };
         };
     };
-    CategoriesController_list: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CategoryResponseDto"][];
-                };
-            };
-        };
-    };
     VideoReactionsController_summary: {
         parameters: {
             query?: never;
@@ -3162,6 +3202,72 @@ export interface operations {
             };
             /** @description Unauthorized */
             401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    DiscoveryController_feed: {
+        parameters: {
+            query?: {
+                page?: number;
+                limit?: number;
+                /** @description Slug da categoria */
+                category?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginatedVideosResponseDto"];
+                };
+            };
+            /** @description Validation failed */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    DiscoveryController_search: {
+        parameters: {
+            query?: {
+                page?: number;
+                limit?: number;
+                /** @description Termo buscado no título do vídeo e no nome/nickname do canal */
+                q?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginatedVideosResponseDto"];
+                };
+            };
+            /** @description Validation failed (termo < 2 caracteres) */
+            400: {
                 headers: {
                     [name: string]: unknown;
                 };

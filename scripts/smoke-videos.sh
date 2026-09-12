@@ -272,6 +272,14 @@ assert_eq "inscrição de outro usuário" "$(body_of "$(api PUT "/channels/$CHAN
 assert_eq "/me/subscriptions lista o canal" "$(body_of "$(api GET /me/subscriptions "$OTHER")" | jq -r 'length')" "1"
 assert_eq "agregado social público" "$(body_of "$(api GET "/social/videos/$VIDEO_ID")" | jq -r '[.reactions.likes, .commentsCount, .subscription.subscribersCount] | join(",")')" "1,2,1"
 
+# ---------- 8f. home e busca (Fase 07) ----------
+section "8f. Feed da home e busca (Fase 07)"
+assert_eq "feed lista o vídeo publicado" "$(body_of "$(api GET "/feed?limit=50")" | jq -r "[.items[] | select(.id==\"$VIDEO_ID\")] | length")" "1"
+assert_eq "feed filtrado pela categoria" "$(body_of "$(api GET "/feed?category=$CATEGORY_SLUG&limit=50")" | jq -r "[.items[] | select(.id==\"$VIDEO_ID\")] | length")" "1"
+assert_eq "busca por título" "$(body_of "$(api GET "/search?q=Smoke%20editado")" | jq -r "[.items[] | select(.id==\"$VIDEO_ID\")] | length")" "1"
+assert_eq "busca por canal" "$(body_of "$(api GET "/search?q=$NICK")" | jq -r '.total >= 1')" "true"
+assert_eq "termo curto → 400" "$(status_of "$(api GET "/search?q=a")")" "400"
+
 OUT=$(api POST "/videos/$VIDEO_ID/unpublish" "$OWNER")
 assert_eq "POST unpublish" "$(body_of "$OUT" | jq -r '.isPublished')" "false"
 assert_eq "canal público volta a 0" "$(body_of "$(api GET "/channels/$NICK/videos")" | jq -r '.total')" "0"

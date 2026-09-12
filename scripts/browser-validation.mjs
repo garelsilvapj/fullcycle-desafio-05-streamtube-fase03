@@ -81,6 +81,57 @@ ok("seek para 5s funcionou (Range requests)", true, `stream responses: ${JSON.st
 ok("BFF respondeu 206 com Content-Range ao player", streamResponses.some((r) => r.status === 206 && r.range));
 await page.screenshot({ path: `${OUT}/browser-player.png`, fullPage: true });
 
+// 4b) publicar no Studio e assistir como anônimo (Fase 04/05), comentar e se inscrever (Fase 06)
+const videoId = videoUrl.split("/").pop();
+await page.goto(`${FRONT}/studio/videos/${videoId}`);
+const publishRes = page.waitForResponse((r) => r.url().endsWith("/publish") && r.request().method() === "POST");
+await page.getByRole("button", { name: "Publicar" }).click();
+ok("publicar no Studio", (await publishRes).status() === 200);
+const slugMeta = await (await fetch(`${API}/videos/slug/x`)).status; // aquece
+const meta = await json(`${FRONT}/api/videos/${videoId}`, { headers: { cookie: (await page.context().cookies()).map((c) => `${c.name}=${c.value}`).join("; ") } });
+const slug = meta.body?.slug;
+ok("slug do vídeo publicado", !!slug, `status=${slugMeta}`);
+const anon = await browser.newPage();
+await anon.goto(`${FRONT}/watch/${slug}`);
+ok("anônimo abre /watch/[slug] com player", (await anon.locator("[data-slot='video-player']").count()) === 1);
+ok("anônimo vê CTA de login para reagir", (await anon.locator("[data-slot='reaction-login-cta']").count()) === 1);
+ok("home lista o vídeo publicado", (await (await anon.goto(`${FRONT}/`))?.status()) === 200 && (await anon.locator("[data-slot='video-card-public']").count()) >= 1);
+await anon.goto(`${FRONT}/search?q=Valida`);
+ok("busca encontra o vídeo", (await anon.locator("[data-slot='search-grid'] [data-slot='video-card-public']").count()) >= 1);
+await anon.close();
+// logado: segundo usuário comenta e se inscreve
+const email2 = `browser2-${Date.now()}@example.com`;
+const reg2 = await json(`${API}/auth/register`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email: email2, password }) });
+ok("segundo usuário registrado", reg2.status === 201);
+let id2 = "";
+for (let i = 0; i < 20 && !id2; i++) { const s = await json(`${MAILPIT}/api/v1/search?query=to:${email2}`); id2 = s.body?.messages?.[0]?.ID ?? ""; if (!id2) await new Promise(r => setTimeout(r, 500)); }
+const msg2 = await json(`${MAILPIT}/api/v1/message/${id2}`);
+const token2 = ((msg2.body?.Text ?? "") + " " + (msg2.body?.HTML ?? "")).match(/token=([A-Za-z0-9._~-]+)/)?.[1];
+await fetch(`${API}/auth/confirm-email?token=${token2}`);
+const ctx2 = await browser.newContext();
+const p2 = await ctx2.newPage();
+await p2.goto(`${FRONT}/login`);
+await p2.getByLabel("Email address").fill(email2);
+await p2.getByLabel("Password", { exact: true }).fill(password);
+const login2 = p2.waitForResponse((r) => r.url().includes("/api/auth/login"));
+await p2.getByRole("button", { name: "Sign in" }).click();
+await login2;
+await p2.goto(`${FRONT}/watch/${slug}`);
+const likeRes = p2.waitForResponse((r) => r.url().endsWith("/reaction") && r.request().method() === "PUT");
+await p2.locator("[data-slot='like-button']").first().click();
+ok("like registrado pela API real", (await likeRes).status() === 200);
+await p2.getByLabel("Adicione um comentário").fill("Comentário da validação");
+const commentRes = p2.waitForResponse((r) => r.url().endsWith("/comments") && r.request().method() === "POST");
+await p2.getByRole("button", { name: "Comentar" }).click();
+ok("comentário criado pela API real", (await commentRes).status() === 201);
+const subRes = p2.waitForResponse((r) => r.url().includes("/subscription") && r.request().method() === "PUT");
+await p2.getByRole("button", { name: "Inscrever-se" }).click();
+ok("inscrição registrada pela API real", (await subRes).status() === 200);
+await p2.goto(`${FRONT}/subscriptions`);
+ok("/subscriptions lista o canal seguido", (await p2.locator("[data-slot='followed-channel']").count()) === 1);
+await ctx2.close();
+await page.screenshot({ path: `${OUT}/browser-journey.png`, fullPage: true });
+
 // 5) lista + exclusão
 await page.goto(`${FRONT}/videos`);
 ok("lista mostra 1 card ready", (await page.locator("[data-slot='video-card'][data-status='ready']").count()) === 1);

@@ -291,3 +291,7 @@ Reutilizar: `DomainException`/filtros (`src/common`), `@CurrentUser`/`@Public`, 
   `docs/decisions/technical-decisions-phase-05-watch.md`, `docs/phases/phase-05-watch/`. Próximo: Fase 06.
 - 2026-09-05 — Fase 06 implementada (reações, comentários com resposta, inscrições, agregados sociais):
   `docs/decisions/technical-decisions-phase-06-social.md`, `docs/phases/phase-06-social/`. Próximo: Fase 07.
+- 2026-09-05 — Fase 07 implementada (home, busca, header responsivo, produção e jornada completa):
+  `docs/decisions/technical-decisions-phase-07-home.md`, `docs/phases/phase-07-home/`, `docs/deploy.md`.
+  Todas as fases do `docs/project-plan.md` estão implementadas; pendência transversal: alinhamento visual
+  com o Figma (o MCP do Figma não esteve disponível) — rodar `/screen-inventory` + drift audit por fase.

@@ -2,7 +2,7 @@
 
 Projeto da disciplina **Desenvolvimento de Aplicações de IA** do MBA de Engenharia de Software com IA da [Full Cycle](https://fullcycle.com.br).
 
-Este é um projeto greenfield desenvolvido para demonstrar como construir uma aplicação do zero utilizando IA de forma adequada no processo de desenvolvimento.
+Este é um projeto greenfield desenvolvido para demonstrar como construir uma aplicação do zero utilizando IA de forma adequada no processo de desenvolvimento. Usuários cadastrados enviam vídeos de até 10GB, gerenciam e publicam seus canais; qualquer pessoa assiste; likes, comentários e inscrições exigem login.
 
 ## Professor
 
@@ -31,27 +31,46 @@ Contém os fundamentos visuais do StreamTube — tokens (cores, tipografia, espa
 
 ---
 
+## 📚 Status do Projeto
+
+Todas as fases do [plano do projeto](docs/project-plan.md) estão implementadas, testadas e validadas com a aplicação rodando.
+
+| Fase | Descrição | Status |
+|------|-----------|--------|
+| **01** | Configuração Base do Projeto | ✅ Concluída |
+| **02** | Cadastro, Login e Gerenciamento de Conta | ✅ Concluída |
+| **03** | Upload e Processamento de Vídeos | ✅ Concluída |
+| **04** | Gerenciamento de Vídeos e Canal | ✅ Concluída |
+| **05** | Página de Visualização do Vídeo | ✅ Concluída |
+| **06** | Interações Sociais (Likes, Comentários, Inscrições) | ✅ Concluída |
+| **07** | Página Inicial, Busca e Finalização (produção) | ✅ Concluída |
+
+**Pendência transversal:** as telas das Fases 04 a 07 foram construídas com o design system existente, mas ainda não passaram pelo inventário e drift audit contra o Figma (o MCP do Figma não estava disponível durante a implementação). O detalhe está no `progress.md` de cada fase em `docs/phases/`.
+
+Histórico completo do fechamento da Fase 03 e da evolução até a Fase 07, com o processo de engenharia adotado (decisões → plano → implementação → testes → validação local → CI → commit), em [`docs/evolution-plan.md`](docs/evolution-plan.md).
+
+---
+
 ## 📋 Pré-requisitos
 
 - Docker e Docker Compose
-- Node.js v25+ (para rodar os testes E2E do Playwright no host)
-- npm
+- Node.js 20+ e npm no host (apenas para o Playwright e os scripts de validação; todo o resto roda em containers)
 
 ## 🏗️ Arquitetura
 
-O projeto é um monorepo baseado em containers Docker. Cada subprojeto sobe sua própria stack via `docker compose`.
+O projeto é um monorepo baseado em containers Docker. Em desenvolvimento, cada subprojeto sobe sua própria stack via `docker compose`; em produção, `compose.prod.yaml` sobe tudo junto.
 
-- **Frontend** (Next.js 16, App Router + React Server Components) — interface da plataforma. Segue o **modelo BFF**: o navegador nunca chama a API NestJS diretamente; todo tráfego passa por Route Handlers same-origin em `app/api/**`, que fazem proxy server-side para a API.
-- **API** (NestJS 11) — regras de negócio, autenticação (JWT + refresh token rotation), envio de e-mails e acesso ao banco.
-- **Database** (PostgreSQL 17) — usuários, canais e tokens de autenticação.
-- **Email Service** (Mailpit) — captura os e-mails transacionais (confirmação de conta e recuperação de senha) em uma UI local.
-- **Video Worker** (`worker/`, Node + FFmpeg) — consome a fila `video-processing`, gera thumbnail e MP4 H.264/AAC e atualiza o status do vídeo.
-- **Object Storage** (MinIO, API S3) — arquivos originais, processados e thumbnails. O upload vai direto do cliente para o storage por URL pré-assinada (single ou multipart até 10GB).
-- **Message Queue** (Redis + BullMQ) — fila de processamento de vídeos (`jobId = videoId`, 5 tentativas com backoff).
+- **Frontend** (Next.js 16, App Router + React Server Components) — interface da plataforma. Segue o **modelo BFF**: o navegador nunca chama a API NestJS diretamente; todo tráfego passa por Route Handlers same-origin em `app/api/**`, que fazem proxy server-side para a API com a sessão (iron-session) e refresh transparente. A única exceção documentada é o **upload**, que vai do navegador direto para o object storage por URL pré-assinada.
+- **API** (NestJS 11) — regras de negócio, autenticação (JWT + refresh token rotation), vídeos, canais, categorias, interações sociais, descoberta (feed/busca), envio de e-mails e acesso ao banco. Contrato publicado em OpenAPI (`nestjs-project/openapi.json`) e consumido pelo frontend com tipos gerados.
+- **Video Worker** (`worker/`, Node + FFmpeg) — consome a fila `video-processing`, gera thumbnail e MP4 H.264/AAC, grava duração e tamanho e atualiza o status do vídeo (`uploading → uploaded → processing → ready | failed`).
+- **Database** (PostgreSQL 17) — usuários, canais, tokens de autenticação, categorias, vídeos, reações, comentários e inscrições (schema versionado por migrations TypeORM).
+- **Object Storage** (MinIO em dev, S3-compatível) — arquivos originais, processados e thumbnails. Upload single ou multipart (até 10GB) direto do cliente por URLs pré-assinadas; streaming via API com HTTP Range.
+- **Message Queue** (Redis + BullMQ) — fila de processamento de vídeos (`jobId = videoId`, 5 tentativas com backoff exponencial).
+- **Email Service** (Mailpit em dev, SMTP em produção) — confirmação de conta e recuperação de senha.
 
 O diagrama de arquitetura completo (C4) está em `docs/diagrams/software-arch.mermaid`.
 
-## 🚀 Como rodar
+## 🚀 Como rodar (desenvolvimento)
 
 Os dois subprojetos têm stacks Docker **separadas**. Suba primeiro o backend, rode as migrations e depois o frontend.
 
@@ -70,6 +89,9 @@ docker compose exec nestjs-api npm install
 # Cria o schema do banco (obrigatório — synchronize está desabilitado)
 docker compose exec nestjs-api npm run migration:run
 
+# (Opcional) usuário de desenvolvimento já confirmado: dev@streamtube.local / Dev@123456
+docker compose exec nestjs-api npm run seed
+
 # Sobe o servidor de desenvolvimento em watch mode
 docker compose exec -d nestjs-api npm run start:dev
 ```
@@ -87,13 +109,13 @@ Serviços disponíveis:
 | Video Worker | sem porta — acompanhe com `docker compose logs -f worker` |
 | Swagger (opcional) | http://localhost:3000/api/docs — habilite com `SWAGGER_ENABLED=true` |
 
+> `S3_PUBLIC_ENDPOINT` (default `http://localhost:9000`) é o endereço do storage que o navegador alcança; a API usa `S3_ENDPOINT` (`http://minio:9000`) internamente.
+
 ### 2. Frontend (Next.js)
 
 ```bash
 cd next-frontend
-
-# Garanta que o .env.local existe (veja .env.example)
-# API_URL aponta para o backend; SESSION_PASSWORD protege a sessão (iron-session)
+cp .env.example .env.local      # API_URL aponta para o backend; SESSION_PASSWORD protege a sessão
 
 docker compose up -d
 docker compose exec next-frontend npm install        # apenas na primeira vez
@@ -104,60 +126,64 @@ A aplicação ficará disponível em **http://localhost:3001**.
 
 > As stacks são separadas, então o frontend acessa o backend via `host.docker.internal:3000` (configurado em `next-frontend/.env.local` e no `extra_hosts` do compose).
 
+### Sincronizar o contrato OpenAPI
+
+Sempre que a API mudar, regenere o contrato e os tipos do frontend (a CI bloqueia drift):
+
+```bash
+cd nestjs-project && docker compose exec nestjs-api npm run openapi:export
+cd .. && bash scripts/sync-openapi.sh
+cd next-frontend && docker compose exec next-frontend npm run openapi:types
+```
+
 ## 🧪 Testes
 
-### Backend (Jest)
+| Suíte | Onde roda | Comando |
+|-------|-----------|---------|
+| Backend unit + integração (Jest, Postgres/MinIO/Redis reais) | container | `docker compose exec nestjs-api npm test -- --runInBand` |
+| Backend e2e (supertest) | container | `docker compose exec nestjs-api npm run test:e2e` |
+| Worker (Vitest; FFmpeg real na imagem) | host / Docker | `npm test` em `worker/` · `docker build --target test -t streamtube-worker-test worker && docker run --rm streamtube-worker-test` |
+| Frontend unit + integração (Vitest + MSW) | container | `docker compose exec next-frontend npm test` |
+| Frontend e2e (Playwright) | host | `npx playwright test` em `next-frontend/` com o dev server em `MSW_ENABLED=true` |
 
-```bash
-cd nestjs-project
-docker compose exec nestjs-api npm test               # unitários + integração
-docker compose exec nestjs-api npm run test:e2e       # end-to-end (HTTP via supertest)
-docker compose exec nestjs-api npm run test:cov       # cobertura
-```
+Sufixos do backend: `*.spec.ts` (unitário), `*.integration-spec.ts` (integração com serviços reais), `*.e2e-spec.ts` (HTTP completo). Sufixos do frontend: `*.test.ts(x)` (unitário), `*.integration.test.ts(x)` (Route Handlers como função com MSW), `*.e2e-spec.ts` (Playwright). Nos testes do frontend o MSW substitui a API NestJS — eles nunca batem no backend real.
 
-Sufixos: `*.spec.ts` (unitário), `*.integration-spec.ts` (integração com banco/MinIO/Redis reais), `*.e2e-spec.ts` (end-to-end). Testes de integração/e2e rodam com `--runInBand` (`test:e2e` já embute a flag; para `npm test` passe `-- --runInBand`).
+Para os E2E do frontend, suba o dev server com MSW (`docker compose exec -d next-frontend sh -c "MSW_ENABLED=true npm run dev"`); o MSW carrega os handlers só no boot, então reinicie o dev server após alterar `next-frontend/mocks/`.
 
-### Worker (Vitest)
-
-```bash
-cd worker
-npm ci && npm run typecheck && npm test                     # no host: unit (FFmpeg real é pulado sem ffmpeg)
-docker build --target test -t streamtube-worker-test . && docker run --rm streamtube-worker-test   # com FFmpeg real
-```
-
-### Validação funcional local (aplicação rodando)
+### Validação funcional com a aplicação rodando
 
 Com a stack do backend no ar e a API em `start:dev`:
 
 ```bash
-bash scripts/smoke-videos.sh                # registrar → PUT → confirmar → worker → stream/download/thumbnail → multipart → delete
+# API real: usuário via Mailpit → upload → worker → stream/download → publicação → canal público →
+# visualização anônima, views e sugestões → reações, comentários, inscrições → feed e busca → exclusão
+bash scripts/smoke-videos.sh                # ~5 min (inclui multipart de 150MB); --skip-multipart para ~1 min
+
+# Navegador real (Chromium) contra API + worker + MinIO reais, com o frontend em `npm run dev` SEM MSW:
+cd next-frontend && npx playwright install chromium && cd ..
+node scripts/browser-validation.mjs         # jornada completa: cadastro → upload → publicar → assistir anônimo → interagir
 ```
 
-Roteiro manual e cenários de resiliência em `docs/phases/phase-03-videos/manual-validation.md`.
+Roteiro manual, cenários de resiliência e o registro das execuções em `docs/phases/phase-03-videos/manual-validation.md`.
 
 ### CI
 
-`.github/workflows/ci.yml` roda em push/PR: API (typecheck, build, lint, unit + integração + e2e com Postgres/Redis/MinIO/Mailpit, frescor do `openapi.json`), worker (typecheck, build, testes na imagem com FFmpeg) e frontend (typecheck, lint, Vitest).
+`.github/workflows/ci.yml` roda em push/PR: API (typecheck, build, lint, unit + integração + e2e com Postgres/Redis/MinIO/Mailpit, frescor do `openapi.json`), worker (typecheck, build, testes na imagem com FFmpeg), frontend (typecheck, lint, Vitest, frescor dos tipos gerados) e build das imagens de produção com validação do `compose.prod.yaml`.
 
-### Frontend (Vitest + Playwright)
+## 📦 Produção
 
 ```bash
-cd next-frontend
-docker compose exec next-frontend npm test            # unitários + integração (Vitest + MSW)
-npx playwright test                                   # end-to-end (no host, com dev server em MSW_ENABLED=true)
+cp .env.production.example .env.production   # preencha os segredos (openssl rand -hex 32)
+docker compose -f compose.prod.yaml --env-file .env.production up -d --build
 ```
 
-Sufixos: `*.test.ts(x)` (unitário), `*.integration.test.ts(x)` (Route Handlers com MSW), `*.e2e-spec.ts` (Playwright). MSW intercepta as chamadas à API NestJS — os testes nunca batem no backend real.
+Sobe Postgres, Redis e MinIO com volumes, a API (imagem multi-stage, aplica migrations no start), o worker e o frontend (Next standalone); o navegador só alcança o frontend (3001) e o storage (9000), atrás de um reverse proxy TLS externo. Runbook completo (topologia, proxy, backups, atualização, escala do worker) em [`docs/deploy.md`](docs/deploy.md).
 
-## ✅ Funcionalidades implementadas
-
-**Fase 01 — Configuração base**, **Fase 02 — Autenticação** e **Fase 03 — Vídeos** estão concluídas (backend + frontend).
+## ✅ Funcionalidades
 
 ### Autenticação (Fase 02)
 
 Fluxo completo de **cadastro → confirmação por e-mail → login → recuperação de senha**, com canal criado automaticamente para cada usuário (a partir do prefixo do e-mail).
-
-Endpoints da API (`nestjs-project`):
 
 | Método & Rota | Descrição |
 |---------------|-----------|
@@ -171,37 +197,21 @@ Endpoints da API (`nestjs-project`):
 | `POST /auth/reset-password` | Redefine a senha via token |
 | `GET /auth/me` | Dados do usuário autenticado (protegido por JWT) |
 
-Telas e Route Handlers BFF (`next-frontend`):
+Telas: `/signup`, `/login`, `/forgot-password` (React Hook Form + Zod) sobre o BFF `app/api/auth/**`. Segurança: senhas com **Argon2**, **JWT** com `JwtAuthGuard` global (opt-out via `@Public()`, com Bearer opcional em rotas públicas), **rotação de refresh token** com detecção de reuso, **rate limiting** nos endpoints de auth, sessão no navegador via **iron-session** (cookie HTTP-only) e `helmet` na API.
 
-- `/(auth)/signup`, `/(auth)/login`, `/(auth)/forgot-password` — formulários com React Hook Form + Zod e validação inline.
-- `app/api/auth/{signup,login,logout,forgot-password}` — proxy same-origin para a API.
+### Upload e processamento de vídeos (Fase 03)
 
-Segurança: senhas com **Argon2**, **JWT** com `JwtAuthGuard` global (opt-out via `@Public()`), **rotação de refresh token** com detecção de reuso, **rate limiting** (`ThrottlerGuard`) nos endpoints de auth, e sessão no navegador via **iron-session** (cookies HTTP-only).
-
-### Vídeos (Fase 03)
-
-Ciclo completo de upload e processamento, com backend, worker, frontend, testes em todas as camadas e validação funcional local (`scripts/smoke-videos.sh`). Histórico do fechamento em [`docs/evolution-plan.md`](docs/evolution-plan.md).
-
-Estados do vídeo: `uploading → uploaded → processing → ready | failed`.
+Estados do vídeo: `uploading → uploaded → processing → ready | failed`. Cada vídeo recebe uma URL curta única (`slug` de 11 caracteres).
 
 | Método & Rota | Descrição |
 |---------------|-----------|
-| `POST /videos` | Registra o vídeo no canal do usuário e devolve o plano de upload (`single`: URL pré-assinada; `multipart`: `uploadId` + URLs por parte) |
-| `POST /videos/:id/confirm` | Confirma um upload `single` → `uploaded` e enfileira o processamento |
-| `POST /videos/:id/multipart/complete` | Finaliza um upload multipart (ETags) → `uploaded` e enfileira |
-| `POST /videos/:id/multipart/abort` | Cancela um upload multipart |
-| `GET /videos` | Lista os vídeos do canal do usuário |
-| `GET /videos/:id` | Metadados e status do vídeo |
-| `GET /videos/:id/stream` | Streaming com `Range` → `206 Partial Content` (só `ready`) |
-| `GET /videos/:id/download` | Redireciona (302) para URL pré-assinada de download (só `ready`) |
+| `POST /videos` | Registra o vídeo como rascunho e devolve o plano de upload (`single`: URL pré-assinada; `multipart`: `uploadId` + URLs por parte, até 10GB) |
+| `POST /videos/:id/confirm` · `POST /videos/:id/multipart/complete` · `/abort` | Confirma (ou cancela) o upload → `uploaded` e enfileira o processamento |
+| `GET /videos/:id` · `DELETE /videos/:id` | Metadados/status do vídeo do próprio canal; exclusão com limpeza do storage |
+| `GET /videos/:id/stream` | Streaming com `Range` → `206 Partial Content` (e `416` fora dos limites) |
+| `GET /videos/:id/download` · `/thumbnail` | Redirecionam (302) para URLs pré-assinadas |
 
-Fluxo: registrar → `PUT` do arquivo na URL pré-assinada → confirmar → worker processa (thumbnail + MP4 H.264/AAC, duração) → `GET /stream`.
-
-Telas e BFF (`next-frontend`, fatia `phase-03-videos-frontend`):
-
-- `/upload` — formulário com progresso (single ou multipart direto ao storage), cancelamento e acompanhamento até `ready`.
-- `/videos` — meus vídeos com status, thumbnail e auto-refresh; `/videos/[id]` — player HTML5 via `GET /api/videos/[id]/stream` (Range → 206), download, exclusão.
-- `app/api/videos/**` — Route Handlers com sessão + refresh transparente; `docs/decisions/technical-decisions-phase-03-videos-frontend.md`.
+Fluxo: registrar → `PUT` do arquivo na URL pré-assinada (direto no storage) → confirmar → worker gera thumbnail + MP4 H.264/AAC e grava duração/tamanho → `ready`. Telas: `/upload` (progresso, cancelamento, acompanhamento até `ready`), `/videos` e `/videos/[id]` (player HTML5 via BFF com Range).
 
 ### Gerenciamento de vídeos e canal (Fase 04)
 
@@ -215,7 +225,7 @@ Telas e BFF (`next-frontend`, fatia `phase-03-videos-frontend`):
 | `GET /channels/me` · `PATCH /channels/me` | Meu canal (nome, nickname único, descrição) |
 | `GET /channels/:nickname` · `GET /channels/:nickname/videos` | Página pública do canal (público) |
 
-Telas: `/studio` (painel), `/studio/videos/[id]` (editar/publicar/thumbnail), `/studio/channel` (canal) e `/c/[nickname]` (página pública, sem login). Decisões em `docs/decisions/technical-decisions-phase-04-management.md`.
+Telas: `/studio` (painel com filtros, views, likes e comentários), `/studio/videos/[id]` (editar, publicar, thumbnail), `/studio/channel` e `/c/[nickname]` (página pública, sem login).
 
 ### Visualização pública (Fase 05)
 
@@ -226,7 +236,7 @@ Telas: `/studio` (painel), `/studio/videos/[id]` (editar/publicar/thumbnail), `/
 | `POST /videos/:id/views` | Registra uma visualização (o player chama no primeiro `play`) |
 | `GET /videos/:id/related?limit` | Sugestões da mesma categoria (fallback: recentes) |
 
-Tela: `/watch/[slug]` (anônimo) com player, informações, descrição expansível, download, link do canal e sidebar de sugestões. Decisões em `docs/decisions/technical-decisions-phase-05-watch.md`.
+Tela: `/watch/[slug]` (anônimo) com player, informações, descrição expansível, download, link do canal e sidebar de sugestões. Vídeos `unlisted` abrem pelo link e não aparecem em listagens.
 
 ### Interações sociais (Fase 06)
 
@@ -238,78 +248,78 @@ Tela: `/watch/[slug]` (anônimo) com player, informações, descrição expansí
 | `GET/PUT/DELETE /channels/:id/subscription` · `GET /me/subscriptions` | Inscrições (sem auto-inscrição) e canais seguidos com últimos vídeos |
 | `GET /social/videos/:id` · `GET /social/videos?ids=` | Agregados (reações, comentários, inscrição) para a página e o painel |
 
-Telas: reações, comentários e inscrição em `/watch/[slug]`, inscrição em `/c/[nickname]`, `/subscriptions` e contagens reais no Studio. Decisões em `docs/decisions/technical-decisions-phase-06-social.md`.
+Telas: reações, comentários e inscrição em `/watch/[slug]`, inscrição em `/c/[nickname]`, `/subscriptions`. Anônimos veem contagens e comentários e recebem CTAs de login.
+
+### Home, busca e navegação (Fase 07)
+
+| Método & Rota | Descrição |
+|---------------|-----------|
+| `GET /feed?category&page&limit` | Feed da home (públicos publicados; filtro por slug de categoria) |
+| `GET /search?q&page&limit` | Busca por título do vídeo e nome/nickname do canal (índices `pg_trgm`) |
+
+Telas: `/` (chips de categoria, grid, "carregar mais" progressivo), `/search?q=` paginada, busca e navegação responsiva no header.
+
+As decisões técnicas de cada fase estão em `docs/decisions/technical-decisions-phase-0N-*.md`.
 
 ## 🛠️ Estrutura do Projeto
 
 ```
-green-field-ia-project/
+desafio-05-streamtube-fase03/
 ├── docs/
-│   ├── project-plan.md                  # Planejamento geral do projeto
-│   ├── evolution-plan.md                # Status real + plano de evolução (Fase 03 → 07)
+│   ├── project-plan.md                  # Planejamento geral (7 fases)
+│   ├── evolution-plan.md                # Auditoria, plano de evolução e histórico de execução
+│   ├── deploy.md                        # Runbook de produção
 │   ├── decisions/                       # Decisões técnicas (TDs) por fase/tarefa
-│   ├── phases/                          # Planos e implementação por fase
-│   │   ├── phase-01-configuracao-base/
-│   │   ├── phase-02-auth/               # Auth (backend)
-│   │   ├── phase-02-auth-frontend/      # Auth (frontend)
-│   │   └── phase-03-videos/             # Upload e processamento (backend + worker)
-│   └── diagrams/
-│       └── software-arch.mermaid        # Diagrama de arquitetura (C4)
+│   ├── phases/                          # Plano, progresso e validação por fase (01 → 07)
+│   ├── inventories/                     # Inventário de telas (Figma) da Fase 02
+│   └── diagrams/                        # Arquitetura (C4) e fluxos das skills
 ├── nestjs-project/                      # Backend API (NestJS 11)
 │   ├── src/
-│   │   ├── auth/                        # Cadastro, login, JWT, refresh, reset de senha
-│   │   ├── users/                       # Entidade e serviço de usuários
-│   │   ├── channels/                    # Canal 1:1 por usuário (nickname do e-mail)
-│   │   ├── mail/                        # Envio de e-mails (templates Handlebars)
-│   │   ├── videos/                      # Registro, confirmação, streaming e download de vídeos
-│   │   ├── storage/                     # StorageService (MinIO/S3: presigned, range, multipart)
-│   │   ├── queue/                       # Producer BullMQ (fila video-processing)
-│   │   ├── common/                      # Filtros, pipes e exceptions de domínio
-│   │   ├── config/                      # Configs namespaced (Joi)
-│   │   └── database/                    # data-source, migrations e seeds
-│   ├── test/                            # Testes e2e
-│   ├── compose.yaml                     # Docker Compose (API + PostgreSQL + Mailpit + Redis + MinIO + worker)
-│   └── Dockerfile.dev
-├── worker/                              # Video Worker (BullMQ consumer + FFmpeg)
+│   │   ├── auth/ users/ channels/ mail/ # Fase 02: cadastro, JWT/refresh, canal 1:1, e-mails
+│   │   ├── videos/ storage/ queue/      # Fase 03–05: vídeos, MinIO/S3, producer BullMQ
+│   │   ├── categories/                  # Fase 04: categorias fixas
+│   │   ├── reactions/ comments/         # Fase 06: likes/dislikes e comentários
+│   │   ├── subscriptions/ social/       # Fase 06: inscrições e agregados sociais
+│   │   ├── discovery/                   # Fase 07: feed e busca
+│   │   ├── common/ config/ database/    # Filtros/exceptions, configs Joi, migrations e seeds
+│   │   └── test/                        # Helpers de teste (data source, Mailpit)
+│   ├── test/                            # Testes e2e (supertest)
+│   ├── compose.yaml                     # Stack de desenvolvimento
+│   ├── Dockerfile.dev · Dockerfile      # Dev (container idle) · produção (multi-stage)
+│   ├── openapi.json                     # Contrato exportado (fonte dos tipos do frontend)
+│   └── api.http                         # Requisições de exemplo (REST Client)
+├── worker/                              # Video Worker (BullMQ consumer + FFmpeg), Vitest, Dockerfile multi-stage
 ├── next-frontend/                       # Frontend (Next.js 16, App Router)
-│   ├── app/                             # Rotas, layouts, páginas e Route Handlers BFF
-│   ├── components/                      # Componentes de auth, UI (shadcn) e ícones
-│   ├── lib/                             # env, api (openapi-fetch), auth/session
-│   ├── mocks/                           # MSW (handlers + server)
+│   ├── app/(auth)/ app/(app)/           # Telas de auth · telas da plataforma (home, watch, studio, canal…)
+│   ├── app/api/                         # Route Handlers BFF (auth, videos, channels, comments, social, search…)
+│   ├── components/                      # auth, ui (shadcn), icons, layout, videos, discovery, social, channels
+│   ├── hooks/ lib/                      # sessão, upload, contratos/tipos OpenAPI, helpers server-side
+│   ├── mocks/                           # MSW (handlers e factories por domínio)
 │   ├── tests/                           # E2E (Playwright)
-│   ├── compose.yaml                     # Docker Compose (dev server)
-│   └── Dockerfile.dev
-├── CLAUDE.md                            # Instruções para IA
+│   ├── compose.yaml                     # Dev server
+│   └── Dockerfile.dev · Dockerfile      # Dev · produção (standalone)
+├── scripts/
+│   ├── sync-openapi.sh                  # Copia o contrato da API para o frontend
+│   ├── smoke-videos.sh                  # Validação funcional da API real (Fases 03–07)
+│   └── browser-validation.mjs           # Jornada completa no navegador contra a stack real
+├── compose.prod.yaml                    # Produção single-host (+ .env.production.example)
+├── .github/workflows/ci.yml             # CI: API, worker, frontend e imagens de produção
+├── CLAUDE.md                            # Instruções para IA (+ .claude/ com skills, rules e agents)
 ├── FC Tube.fig                          # Design system do projeto (Figma)
 ├── whiteboard.png                       # Quadro branco do projeto
 └── README.md
 ```
 
-## 📚 Fases do Projeto
-
-| Fase | Descrição | Status |
-|------|-----------|--------|
-| **01** | Configuração Base do Projeto | ✅ Concluída |
-| **02** | Cadastro, Login e Gerenciamento de Conta | ✅ Concluída |
-| **03** | Upload e Processamento de Vídeos | ✅ Concluída (backend, worker, frontend, testes, CI) — histórico em [`docs/evolution-plan.md`](docs/evolution-plan.md) |
-| **04** | Gerenciamento de Vídeos e Canal | ✅ Concluída (categorias, edição, publicação, thumbnail própria, Studio, canal público) — pendente alinhamento visual com o Figma |
-| **05** | Página de Visualização do Vídeo | ✅ Concluída (`/watch/[slug]` público, views, sugestões, download, unlisted por link) — pendente alinhamento visual com o Figma |
-| **06** | Interações Sociais (Likes, Comentários, Inscrições) | ✅ Concluída — pendente alinhamento visual com o Figma |
-| **07** | Página Inicial, Busca e Finalização | ⏳ Planejada |
-
-Detalhes completos em `docs/project-plan.md`.
-
 ## 📖 Stack Tecnológica
 
 | Camada | Tecnologia |
 |--------|------------|
-| Frontend | Next.js 16, React 19, TypeScript, Tailwind CSS 4, shadcn/ui, React Hook Form + Zod, iron-session, openapi-fetch |
-| Backend | NestJS 11, TypeScript, TypeORM, JWT, Argon2, Mailer (Handlebars), AWS SDK S3, BullMQ |
-| Video Worker | Node 22, BullMQ, FFmpeg (fluent-ffmpeg), pg |
-| Banco de Dados | PostgreSQL 17 |
-| Storage / Fila | MinIO (S3) / Redis 7 |
-| E-mail (dev) | Mailpit |
-| Containerização | Docker, Docker Compose |
-| Testes | Jest, Supertest (backend); Vitest, MSW, Playwright (frontend) |
-| Qualidade | ESLint, Prettier |
-</content>
+| Frontend | Next.js 16, React 19, TypeScript, Tailwind CSS 4, shadcn/ui, React Hook Form + Zod, iron-session, openapi-fetch + openapi-typescript |
+| Backend | NestJS 11, TypeScript, TypeORM, JWT, Argon2, Mailer (Handlebars), AWS SDK S3, BullMQ, helmet |
+| Video Worker | Node 22, BullMQ, FFmpeg (fluent-ffmpeg), pg, AWS SDK (lib-storage) |
+| Banco de Dados | PostgreSQL 17 (pg_trgm para busca) |
+| Storage / Fila | MinIO ou S3 / Redis 7 |
+| E-mail | Mailpit (dev) / SMTP (produção) |
+| Containerização | Docker, Docker Compose (dev e produção) |
+| Testes | Jest + Supertest (backend); Vitest (worker); Vitest + MSW + Playwright (frontend) |
+| Qualidade | ESLint, Prettier, GitHub Actions |
