@@ -23,8 +23,28 @@ See `docs/diagrams/software-arch.mermaid` for the full diagram. Key containers:
 - **Video Worker** (FFmpeg) → consumes jobs from queue, processes videos, updates DB and storage
 - **Database** (PostgreSQL) → users, channels, videos, comments, likes
 - **Object Storage** (S3/MinIO) → video files and thumbnails
-- **Message Queue** (TBD) → video processing job queue
+- **Message Queue** (Redis/BullMQ) → video processing job queue
 - **Email Service** (SMTP) → account confirmation and password recovery
+
+## Módulo de Vídeos (Fase 03)
+
+Ciclo completo de upload e processamento de vídeos. Ver
+`docs/phases/phase-03-videos/phase-03-videos.md` e
+`docs/decisions/technical-decisions-phase-03-videos.md`.
+
+- **Storage**: MinIO/S3 via `src/storage/StorageService` (presigned upload/download, range reads).
+  Upload direto ao storage por URL pré-assinada (não passa 10GB pela API).
+- **Fila**: BullMQ/Redis — `src/queue/VideoQueueService.enqueue(videoId)` (idempotente, `jobId=videoId`).
+- **Worker**: `worker/` (processo separado com FFmpeg) consome `video-processing`, gera thumbnail +
+  MP4 H.264/AAC, atualiza o vídeo (`processing → ready|failed`).
+- **Estados**: `uploading → uploaded → processing → ready | failed` (`src/videos/entities/video.entity.ts`).
+- **Endpoints** (`src/videos/videos.controller.ts`, protegidos pelo JwtAuthGuard global; canal
+  resolvido do usuário): `POST /videos`, `POST /videos/:id/confirm`, `GET /videos`,
+  `GET /videos/:id`, `GET /videos/:id/stream` (Range→206), `GET /videos/:id/download`.
+- **Erros**: catálogo `VIDEO_*` (`src/videos/video.exceptions.ts`) via `DomainException` + filtro global.
+- **Infra**: `nestjs-project/compose.yaml` sobe db, mailpit, `redis`, `minio` (+ `createbuckets`) e `worker`.
+
+Fluxo: registrar → `PUT` no `uploadUrl` → confirmar → worker processa → `GET /stream`.
 
 ## Docker Networking
 
